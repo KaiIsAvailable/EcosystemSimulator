@@ -1,0 +1,74 @@
+// Example AtmosphereUI Layout Structure
+// Copy this hierarchy in Unity:
+
+Canvas (Screen Space - Overlay)
+│
+└── AtmospherePanel (UI Panel)
+    │   ├── Rect Transform:
+    │   │   - Anchor: Top-Right
+    │   │   - Pos X: -140, Pos Y: -120
+    │   │   - Width: 260, Height: 220
+    │   │
+    │   ├── Image Component:
+    │   │   - Color: (0, 0, 0, 180) // Semi-transparent black
+    │   │
+    ├── TitleText (UI Text)
+    │   ├── Text: "🌍 ATMOSPHERE"
+    │   ├── Font Size: 18
+    │   ├── Bold: Yes
+    │   ├── Alignment: Center
+    │   ├── Position: Top of panel (Y: -20)
+    │   
+    ├── WaterVaporText (UI Text)
+    │   ├── Text: "H₂O: 2.000%"
+    │   ├── Font Size: 14
+    │   ├── Position: (X: 10, Y: -50)
+    │   
+    ├── NitrogenText (UI Text)
+    │   ├── Text: "N₂: 76.520%"
+    │   ├── Font Size: 14
+    │   ├── Position: (X: 10, Y: -75)
+    │   
+    ├── OxygenText (UI Text)
+    │   ├── Text: "O₂: 20.530%"
+    │   ├── Font Size: 14
+    │   ├── Position: (X: 10, Y: -100)
+    │   ├── Color: Dynamic (White/Yellow/Red)
+    │   
+    ├── ArgonText (UI Text)
+    │   ├── Text: "Ar: 0.915%"
+    │   ├── Font Size: 14
+    │   ├── Position: (X: 10, Y: -125)
+    │   
+    ├── CarbonDioxideText (UI Text)
+    │   ├── Text: "CO₂: 0.041%"
+    │   ├── Font Size: 14
+    │   ├── Position: (X: 10, Y: -150)
+    │   ├── Color: Dynamic (White/Yellow/Red)
+    │   
+    └── TotalText (UI Text)
+        ├── Text: "Total: 100.00%"
+        ├── Font Size: 12
+        ├── Alignment: Center
+        ├── Position: Bottom (Y: -190)
+        ├── Color: Green (if valid) or Red (if invalid)
+
+// HOW IT LOOKS IN GAME:
+/*
+┌─────────────────────────────┐
+│    🌍 ATMOSPHERE            │
+├─────────────────────────────┤
+│  H₂O:  2.000%               │
+│  N₂:  76.520%               │
+│  O₂:  20.530% ✅            │
+│  Ar:   0.915%               │
+│  CO₂:  0.041% ✅            │
+├─────────────────────────────┤
+│      Total: 100.00% ✅      │
+└─────────────────────────────┘
+*/
+
+// COLOR CODING:
+// ✅ White  = Normal
+// ⚠️ Yellow = Warning (O₂ < 18% or CO₂ > 0.1%)
+// 🚨 Red    = Danger  (O₂ < 15% or CO₂ > 0.5%)
