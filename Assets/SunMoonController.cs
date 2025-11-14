@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 public class SunMoonController : MonoBehaviour
 {
@@ -6,9 +7,9 @@ public class SunMoonController : MonoBehaviour
     public Transform sun;     // instance transform
     public Transform moon;    // instance transform
 
-    [Header("Optional Lights (fade by time)")]
-    public Light sunLight;
-    public Light moonLight;
+    [Header("2D Lighting (UPR)")]
+    public Light2D globalLight2D;
+
     [Tooltip("Sun max intensity at local noon; moon at local midnight.")]
     public float sunMaxIntensity = 1.0f;
     public float moonMaxIntensity = 0.6f;
@@ -19,10 +20,14 @@ public class SunMoonController : MonoBehaviour
     public float fullDaySeconds = 120f;
 
     [Header("Sunrise / Sunset (local time)")]
+    [Range(0,23)] public int dawnHour = 5;
+    [Range(0,59)] public int dawnMin  = 30; // 0530
     [Range(0,23)] public int sunriseHour = 6;
-    [Range(0,59)] public int sunriseMin  = 58; // 06:58
-    [Range(0,23)] public int sunsetHour  = 19;
-    [Range(0,59)] public int sunsetMin   = 2;  // 19:02
+    [Range(0,59)] public int sunriseMin  = 0; // 0600
+    [Range(0,23)] public int sunsetHour  = 18;
+    [Range(0,59)] public int sunsetMin   = 0;  // 1800
+    [Range(0,23)] public int duskHour = 19;
+    [Range(0,59)] public int duskMin  = 0; // 1900
 
     [Header("Path settings (relative to camera top)")]
     [Tooltip("Keep sun/moon this far away from the very top edge (world units).")]
@@ -49,6 +54,19 @@ public class SunMoonController : MonoBehaviour
     float sunsetH;
     float dayLenH;
     float nightLenH;
+
+    public enum TimeOfDay
+    {
+        Night,      //1900-0530
+        Dawn,       //0530-0600
+        Morning,    //0600-1200
+        Noon,       //1200
+        Afternoon,  //1200-1800
+        Sunset,     //1800
+        Dusk,       //1800-1900
+    }
+
+    public TimeOfDay currentTimeOfDay;
 
     void Awake()
     {
@@ -104,61 +122,184 @@ public class SunMoonController : MonoBehaviour
         float clockH = time01 * 24f;
         hours = Mathf.FloorToInt(clockH);
         minutes = Mathf.FloorToInt((clockH - hours) * 60f);
-
-        bool isDay = (clockH >= sunriseH) && (clockH < sunsetH);
         
-        // Debug log (only occasionally to avoid spam)
-        if (Random.value < 0.005f)
+        float dawnH = dawnHour + dawnMin / 60f;
+        float sunriseH = sunriseHour + sunriseMin / 60f;
+        float noonH = 12.0f;
+        float sunsetH = sunsetHour + sunsetMin / 60f;
+        float duskH = duskHour + duskMin / 60f;
+
+        if (clockH >= duskH || clockH < dawnH)
         {
-            //Debug.Log($"[SunMoon] Time: {hours:00}:{minutes:00} (clockH={clockH:F2}), sunriseH={sunriseH:F2}, sunsetH={sunsetH:F2}, isDay={isDay}");
+            currentTimeOfDay = TimeOfDay.Night;
+        }
+        else if (clockH >= dawnH && clockH < sunriseH)
+        {
+            currentTimeOfDay = TimeOfDay.Dawn;
+        }
+        else if (clockH >= sunriseH && clockH < noonH)
+        {
+            currentTimeOfDay = TimeOfDay.Morning;
+        }
+        else if (Mathf.Abs(clockH - noonH) < 0.1f)
+        {
+            currentTimeOfDay = TimeOfDay.Noon;
+        }
+        else if (clockH >= noonH && clockH < sunsetH)
+        {
+            currentTimeOfDay = TimeOfDay.Afternoon;
+        }
+        else if (Mathf.Abs(clockH - sunsetH) < 0.1f)
+        {
+            currentTimeOfDay = TimeOfDay.Sunset;
+        }
+        else
+        {
+            currentTimeOfDay = TimeOfDay.Dusk;
         }
 
-        if (sun)  sun.gameObject.SetActive(isDay);
-        if (moon) moon.gameObject.SetActive(!isDay);
+        UpdateSunMoonPosition(clockH);
+        UpdateLighting();
+    }
 
-        if (isDay)
+    void UpdateSunMoonPosition(float clockH)
+    {
+        float sunriseH = sunriseHour + sunriseMin / 60f;
+        float sunsetH  = sunsetHour  + sunsetMin  / 60f;
+
+        if (clockH >= sunriseH && clockH < sunsetH)
         {
-            // Map [sunrise..sunset) -> t∈[0..1] across the sky (sun)
-            float t = Mathf.InverseLerp(sunriseH, sunsetH, clockH);
-            Vector3 pos = GetArcPosition(t);
-            if (sun) sun.position = pos;
-
-            // Optional light fading: noon brightest
-            if (sunLight)
+            if (sun != null)
             {
-                float noonCurve = 1f - Mathf.Abs(t - 0.5f) * 2f; // 0..1..0
-                float target = Mathf.Lerp(0.05f, sunMaxIntensity, noonCurve);
-                sunLight.intensity = Mathf.Lerp(sunLight.intensity, target, Time.deltaTime * lightLerpSpeed);
+                float dayProgress = (clockH - sunriseH) / (sunsetH - sunriseH); // 0..1
+                sun.position = GetArcPosition(dayProgress);
+                sun.gameObject.SetActive(true);
             }
-            if (moonLight)
+            if (moon != null)
             {
-                moonLight.intensity = Mathf.Lerp(moonLight.intensity, 0f, Time.deltaTime * lightLerpSpeed);
+                moon.gameObject.SetActive(false);   
             }
         }
         else
         {
-            // Night has two segments: [sunset..24) and [0..sunrise)
-            float nightClock;
-            if (clockH >= sunsetH)
-                nightClock = clockH - sunsetH;      // after sunset to midnight
-            else
-                nightClock = (24f - sunsetH) + clockH; // after midnight to sunrise
-
-            float t = Mathf.Clamp01(nightClock / nightLenH); // 0..1 across the sky (moon)
-            Vector3 pos = GetArcPosition(t);
-            if (moon) moon.position = pos;
-
-            // Optional light fading: midnight brightest
-            if (moonLight)
+            if (moon != null)
             {
-                float midnightCurve = 1f - Mathf.Abs(t - 0.5f) * 2f; // 0..1..0
-                float target = Mathf.Lerp(0.05f, moonMaxIntensity, midnightCurve);
-                moonLight.intensity = Mathf.Lerp(moonLight.intensity, target, Time.deltaTime * lightLerpSpeed);
+                float nightStart = sunsetH;
+                float nightEnd = sunriseH + 24f; // next day
+                
+                float currentNightTime = clockH < sunsetH ? clockH + 24f : clockH; // adjust for after midnight
+                float nightProgress = (currentNightTime - nightStart) / (nightEnd - nightStart); // 0..1
+
+                moon.position = GetArcPosition(nightProgress);
+                moon.gameObject.SetActive(true);
             }
-            if (sunLight)
+            if (sun != null)
             {
-                sunLight.intensity = Mathf.Lerp(sunLight.intensity, 0f, Time.deltaTime * lightLerpSpeed);
+                sun.gameObject.SetActive(false);
             }
+        }
+    }
+
+    void UpdateLighting()
+    {
+        float targetIntensity = GetLightIntensity();
+        Color ambientColor = GetAmbientColor();
+
+        if (globalLight2D != null) 
+        {
+            globalLight2D.intensity = Mathf.Lerp(
+                globalLight2D.intensity, 
+                targetIntensity, 
+                Time.deltaTime * lightLerpSpeed
+            );
+        }
+        globalLight2D.color = GetAmbientColor();
+    }
+
+    float GetLightIntensity()
+    {
+        switch(currentTimeOfDay)
+        {
+            case TimeOfDay.Night:
+                return moonMaxIntensity;
+            case TimeOfDay.Dawn:
+                float dawnH = dawnHour + dawnMin / 60f;
+                float sunriseH = sunriseHour + sunriseMin / 60f;
+                float clockH = time01 * 24f;
+                float dawnProgress = Mathf.InverseLerp(dawnH, sunriseH, clockH);
+                return Mathf.Lerp(moonMaxIntensity, sunMaxIntensity * 0.5f, dawnProgress);
+            case TimeOfDay.Morning:
+                float morningProgress = Mathf.InverseLerp(6f, 12f, time01 * 24f);
+                return Mathf.Lerp(sunMaxIntensity * 0.5f, sunMaxIntensity, morningProgress);
+            case TimeOfDay.Noon:
+                return sunMaxIntensity;
+            case TimeOfDay.Afternoon:
+                float  afternoonProgress = Mathf.InverseLerp(12f, 18f, time01 * 24f);
+                return Mathf.Lerp(sunMaxIntensity, sunMaxIntensity * 0.5f, afternoonProgress);
+            case TimeOfDay.Sunset:
+                return sunMaxIntensity * 0.3f;
+            case TimeOfDay.Dusk:
+                float duskProgress = Mathf.InverseLerp(18f, 19f, time01 * 24f);
+                return Mathf.Lerp(sunMaxIntensity * 0.3f, moonMaxIntensity, duskProgress);
+            default:
+                return moonMaxIntensity;
+        }
+    }
+
+    Color GetAmbientColor()
+    {
+        switch(currentTimeOfDay)
+        {
+            case TimeOfDay.Night:
+                return new Color(0.1f, 0.1f, 0.2f);
+            case TimeOfDay.Dawn:
+                return new Color(0.9f, 0.6f, 0.4f);
+            case TimeOfDay.Morning:
+                return new Color(1f, 1f, 0.9f);
+            case TimeOfDay.Noon:
+                return new Color(1f, 1f, 1f);
+            case TimeOfDay.Afternoon:
+                return new Color(1f, 0.95f, 0.85f);
+            case TimeOfDay.Sunset:
+                return new Color(1f, 0.7f, 0.5f);
+            case TimeOfDay.Dusk:
+                return new Color(0.4f, 0.3f, 0.5f);
+            default:
+                return Color.white;
+        }
+    }
+
+    public bool CanPhotosynthesize()
+    {
+        return currentTimeOfDay == TimeOfDay.Morning || 
+               currentTimeOfDay == TimeOfDay.Noon || 
+               currentTimeOfDay == TimeOfDay.Afternoon;;
+    }
+
+    public float GetPhotosynthesisEfficiency()
+    {
+        switch(currentTimeOfDay)
+        {
+            case TimeOfDay.Night:
+                return 0f;
+            case TimeOfDay.Dawn:
+                float dawnProgress = Mathf.InverseLerp(5.5f, 6f, time01 * 24f);
+                return Mathf.Lerp(0f, 0.5f, dawnProgress);
+            case TimeOfDay.Morning:
+                float morningProgress = Mathf.InverseLerp(6f, 12f, time01 * 24f); // 0→1
+                return Mathf.Lerp(0.5f, 1f, morningProgress); 
+            case TimeOfDay.Noon:
+                return 1f;
+            case TimeOfDay.Afternoon:
+                float afternoonProgress = Mathf.InverseLerp(12f, 18f, time01 * 24f);
+                return Mathf.Lerp(1f, 0.5f, afternoonProgress);
+            case TimeOfDay.Sunset:
+                return 0.3f;
+            case TimeOfDay.Dusk:
+                float duskProgress = Mathf.InverseLerp(18f, 19f, time01 * 24f);
+                return Mathf.Lerp(0.3f, 0f, duskProgress);  
+            default:
+                return 0f;
         }
     }
 

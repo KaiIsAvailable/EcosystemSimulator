@@ -94,26 +94,23 @@ public class GasExchanger : MonoBehaviour
             // Plant respiration (24/7)
             float respiration = entityType == EntityType.Tree ? -0.5f : -0.1f;
             
-            // Photosynthesis (day only)
-            if (IsDaytime())
+            var controller = FindAnyObjectByType<SunMoonController>();
+            float photoEfficiency = 1f;
+
+            if (controller != null)
             {
-                rate = oxygenRate + respiration; // Gross photosynthesis + respiration
-                
-                // Debug log for trees (only occasionally)
-                if (entityType == EntityType.Tree && Random.value < 0.001f)
-                {
-                    Debug.Log($"[Tree DAY] Photosynthesis: {oxygenRate:F1}, Respiration: {respiration:F1}, Net: {rate:F1}");
-                }
+                photoEfficiency = controller.GetPhotosynthesisEfficiency();
             }
-            else
+            float photosynthesis = oxygenRate * photoEfficiency;
+            rate = photosynthesis + respiration; // Gross photosynthesis + respiration
+
+            if (Random.value < 0.001f && entityType == EntityType.Tree)
             {
-                rate = respiration; // Only respiration at night
-                
-                // Debug log for trees (only occasionally)
-                if (entityType == EntityType.Tree && Random.value < 0.001f)
-                {
-                    Debug.Log($"[Tree NIGHT] Respiration only: {rate:F1}");
-                }
+                Debug.Log($"[Tree] Time: {controller?.currentTimeOfDay}, " +
+                            $"Efficiency: {photoEfficiency:F2}, " +
+                            $"Photosynthesis: {photosynthesis:F1}, " +
+                            $"Respiration: {respiration:F1}, " +
+                            $"Net O₂ Rate: {rate:F1}");
             }
         }
         else
@@ -140,26 +137,25 @@ public class GasExchanger : MonoBehaviour
             // Plant respiration produces CO₂ (24/7)
             float respirationCO2 = entityType == EntityType.Tree ? 0.5f : 0.1f;
             
-            // Photosynthesis consumes CO₂ (day only)
-            if (IsDaytime())
+            var controller = FindAnyObjectByType<SunMoonController>();
+            float photoEfficiency = 1f;
+
+            if (controller != null)
             {
-                rate = co2Rate + respirationCO2; // Gross consumption + respiration production
-                
-                // Debug log for trees (only occasionally)
-                if (entityType == EntityType.Tree && Random.value < 0.001f)
-                {
-                    Debug.Log($"[Tree DAY CO₂] Photosynthesis: {co2Rate:F1}, Respiration: {respirationCO2:F1}, Net: {rate:F1}");
-                }
+                photoEfficiency = controller.GetPhotosynthesisEfficiency();
             }
-            else
+
+            float photosynthesis = co2Rate * photoEfficiency;
+            rate = photosynthesis + respirationCO2; // Gross CO₂ consumption + respiration
+
+            // Debug log occasionally
+            if (Random.value < 0.001f && entityType == EntityType.Tree)
             {
-                rate = respirationCO2; // Only respiration at night
-                
-                // Debug log for trees (only occasionally)
-                if (entityType == EntityType.Tree && Random.value < 0.001f)
-                {
-                    Debug.Log($"[Tree NIGHT CO₂] Respiration only: {rate:F1}");
-                }
+                Debug.Log($"[Tree CO₂] Time: {controller?.currentTimeOfDay}, " +
+                        $"Efficiency: {photoEfficiency:F2}, " +
+                        $"Photosynthesis: {photosynthesis:F1}, " +
+                        $"Respiration: {respirationCO2:F1}, " +
+                        $"Net CO₂: {rate:F1}");
             }
         }
         else
@@ -169,19 +165,6 @@ public class GasExchanger : MonoBehaviour
         }
         
         return rate;
-    }
-    
-    bool IsDaytime()
-    {
-        if (timeController == null) return true; // Default to day
-        
-        float sunriseH = timeController.sunriseHour + timeController.sunriseMin / 60f;
-        float sunsetH = timeController.sunsetHour + timeController.sunsetMin / 60f;
-        float clockH = timeController.time01 * 24f;
-        
-        bool isDay = (clockH >= sunriseH) && (clockH < sunsetH);
-        
-        return isDay;
     }
     
     /// <summary>
