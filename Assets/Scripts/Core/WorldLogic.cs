@@ -16,19 +16,18 @@ public class WorldLogic : MonoBehaviour
     public GameObject oceanWaterPrefab;
 
     [Header("Counts")]
-    public int treeCount = 10;      // Balanced for 24h cycle (was 5)
+    public int treeCount = 10; // Balanced for 24h cycle (was 5)
+    public int grassCount = 55;      
     public int animalCount = 10;
     public int humanCount = 1;
     public int sunCount = 1;
     public int moonCount = 1;
+    
 
     [Header("Spawn Settings")]
     public Vector2 padding = new Vector2(0.5f, 0.5f);
     public float minSpacing = 0.75f;
     public int maxTriesPerSpawn = 30;
-
-    [Header("Grass Settings")]
-    public int grassCount = 55;     // Total grass to spawn (was grassPerTree × treeCount)
     
     [Header("Ocean Settings")]
     [Tooltip("Create ocean at bottom of map (20% of height)")]
@@ -114,8 +113,8 @@ public class WorldLogic : MonoBehaviour
                 GameObject tree = Instantiate(treePrefab, pos, Quaternion.identity);
                 occupied.Add(pos);
 
-                // Add gas exchange capability
-                AddGasExchanger(tree, GasExchanger.EntityType.Tree);
+                // Add PlantAgent for scientific metabolism
+                AddPlantAgent(tree, PlantAgent.PlantType.Tree);
 
                 // Add emission capability (visual particles)
                 AddPlantEmitter(tree, 5f); // Trees emit every 5 seconds
@@ -141,8 +140,8 @@ public class WorldLogic : MonoBehaviour
                 // Optional: slight rotation variation for natural look
                 grassObj.transform.rotation = Quaternion.Euler(0, 0, Random.Range(-15f, 15f));
 
-                // Add gas exchange capability
-                AddGasExchanger(grassObj, GasExchanger.EntityType.Grass);
+                // Add PlantAgent for scientific metabolism
+                AddPlantAgent(grassObj, PlantAgent.PlantType.Grass);
 
                 // Add emission capability (visual particles - grass emits more frequently than trees)
                 AddPlantEmitter(grassObj, 3f); // Grass emits every 3 seconds
@@ -154,8 +153,62 @@ public class WorldLogic : MonoBehaviour
         }
     }
 
+    void AddPlantAgent(GameObject plant, PlantAgent.PlantType type)
+    {
+        // 🛑 CRITICAL: Remove GasExchanger if it exists on prefab (prevents double metabolism)
+        GasExchanger oldExchanger = plant.GetComponent<GasExchanger>();
+        if (oldExchanger != null)
+        {
+            // Unregister from AtmosphereManager first
+            if (AtmosphereManager.Instance != null)
+            {
+                AtmosphereManager.Instance.UnregisterExchanger(oldExchanger);
+            }
+            Destroy(oldExchanger);
+            Debug.LogWarning($"[WorldLogic] Removed GasExchanger from {plant.name} - plants use PlantAgent now!");
+        }
+        
+        // Check if PlantAgent already exists (from prefab)
+        PlantAgent agent = plant.GetComponent<PlantAgent>();
+        
+        if (agent == null)
+        {
+            // Add PlantAgent component
+            agent = plant.AddComponent<PlantAgent>();
+        }
+        
+        // Configure based on plant type
+        agent.plantType = type;
+        agent.metabolismScale = 0.1f;  // Dramatic visible gas exchange
+        
+        if (type == PlantAgent.PlantType.Tree)
+        {
+            agent.R_base = 0.0001f;
+            agent.Q10_factor = 2.5f;
+            agent.P_max = 0.0012f;
+            agent.biomass = 10f;
+        }
+        else // Grass
+        {
+            agent.R_base = 0.00005f;
+            agent.Q10_factor = 2.0f;
+            agent.P_max = 0.0008f;
+            agent.biomass = 5f;
+        }
+        
+        Debug.Log($"[WorldLogic] Added PlantAgent to {plant.name}: type={type}, metabolismScale={agent.metabolismScale}");
+        
+        // Disable BiomassEnergy if it exists (avoid conflicts)
+        var biomassEnergy = plant.GetComponent<BiomassEnergy>();
+        if (biomassEnergy != null)
+        {
+            biomassEnergy.enabled = false;
+        }
+    }
+    
     void AddGasExchanger(GameObject entity, GasExchanger.EntityType type)
     {
+        // Only for animals and humans now - plants use PlantAgent
         GasExchanger exchanger = entity.AddComponent<GasExchanger>();
         exchanger.entityType = type;
         // Default rates are set automatically in GasExchanger.Start()

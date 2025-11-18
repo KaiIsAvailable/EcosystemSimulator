@@ -39,6 +39,25 @@ public class SunMoonController : MonoBehaviour
     [Tooltip("Extra distance beyond the visible bounds so bodies start off-screen.")]
     public float offScreenMargin = 1.3f;
 
+    // Temperature
+    [Header("Temperature Settings")]
+    [Tooltip("Minimum temperature at dawn (°C).")]
+    public float minTemperature = 21f;  // 热带雨林夜间最低温（潮湿环境）
+
+    [Tooltip("Maximum temperature at noon (°C).")]
+    public float maxTemperature = 34f;  // 热带雨林日间最高温（接近上限）
+
+    [Tooltip("Hour when  temperature peaks (24 h  format).")]
+    [Range(12f, 18f)]
+    public float temperaturePeakHour = 15f;  // 下午3点温度峰值（滞后于正午）
+
+    [Tooltip("Hour when temperature is lowest (24 h format).")]
+    [Range(3f, 7f)]
+    public float temperatureMinHour = 5.5f;
+
+    [Tooltip("Current global temperature (°C).")]
+    public float currentTemperature = 24f;
+
     // Bounds (set by WorldLogic)
     [HideInInspector] public Vector3 areaCenter;
     [HideInInspector] public Vector2 areaHalfExtents;
@@ -78,9 +97,7 @@ public class SunMoonController : MonoBehaviour
         // Initialize time to sunrise (6:58 AM) so simulation starts at daytime
         float startTimeHours = sunriseHour + sunriseMin / 60f;  // 6.9667 hours (6:58 AM)
         time01 = startTimeHours / 24f;  // Convert to 0..1 range
-        
-        hours = sunriseHour;
-        minutes = sunriseMin;
+
         day = 0;
         
         //Debug.Log($"[SunMoon] Simulation started at {hours:00}:{minutes:00} (sunrise, daytime)");
@@ -158,6 +175,8 @@ public class SunMoonController : MonoBehaviour
             currentTimeOfDay = TimeOfDay.Dusk;
         }
 
+        currentTemperature = CalculateTemperature(clockH);
+
         UpdateSunMoonPosition(clockH);
         UpdateLighting();
     }
@@ -200,6 +219,43 @@ public class SunMoonController : MonoBehaviour
         }
     }
 
+    float CalculateTemperature(float clockH)
+    {
+        // 使用非对称温度曲线：快速升温 (5:30-15:00)，缓慢降温 (15:00-19:00)，夜晚稳定 (19:00-5:30)
+        
+        // Night: 7:00 PM (19:00) → 5:30 AM (稳定低温)
+        if (clockH >= 19f || clockH < temperatureMinHour)
+        {
+            return minTemperature;  // 夜晚保持最低温度 21°C
+        }
+        // Dawn to Peak: 5:30 AM → 3:00 PM (快速升温)
+        else if (clockH >= temperatureMinHour && clockH <= temperaturePeakHour)
+        {
+            float progress = (clockH - temperatureMinHour) / (temperaturePeakHour - temperatureMinHour);
+            // 使用正弦曲线加速升温
+            float curve = Mathf.Sin(progress * Mathf.PI * 0.5f);  // 0→1 (加速)
+            return Mathf.Lerp(minTemperature, maxTemperature, curve);
+        }
+        // Peak to Evening: 3:00 PM → 7:00 PM (快速降温到夜间温度)
+        else // clockH > temperaturePeakHour && clockH < 19f
+        {
+            float progress = (clockH - temperaturePeakHour) / (19f - temperaturePeakHour);
+            // 使用余弦曲线快速降温
+            float curve = Mathf.Cos(progress * Mathf.PI * 0.5f);  // 1→0 (快速)
+            return Mathf.Lerp(minTemperature, maxTemperature, curve);
+        }
+    }
+
+    public float GetRespirationMultiplier()
+    {
+        float baseTemp = 20f;
+        float Q10 = 2.0f;
+
+        float tempDiff = currentTemperature - baseTemp;
+        float multiplier = Mathf.Pow(Q10, tempDiff / 10f);
+        return multiplier;
+    }
+
     void UpdateLighting()
     {
         float targetIntensity = GetLightIntensity();
@@ -212,8 +268,8 @@ public class SunMoonController : MonoBehaviour
                 targetIntensity, 
                 Time.deltaTime * lightLerpSpeed
             );
+            globalLight2D.color = GetAmbientColor();
         }
-        globalLight2D.color = GetAmbientColor();
     }
 
     float GetLightIntensity()
@@ -273,7 +329,7 @@ public class SunMoonController : MonoBehaviour
     {
         return currentTimeOfDay == TimeOfDay.Morning || 
                currentTimeOfDay == TimeOfDay.Noon || 
-               currentTimeOfDay == TimeOfDay.Afternoon;;
+               currentTimeOfDay == TimeOfDay.Afternoon;
     }
 
     public float GetPhotosynthesisEfficiency()

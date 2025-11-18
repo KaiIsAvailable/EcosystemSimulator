@@ -59,7 +59,7 @@ public class AtmosphereManager : MonoBehaviour
     
     [Header("Ocean CO₂ Sink (Optional)")]
     [Tooltip("Moles of CO₂ absorbed by ocean per day (0 = no ocean)")]
-    public float oceanAbsorptionRate = 5f;  // Balanced for 24h cycle (was 10)
+    public float oceanAbsorptionRate = 20.0f;  // Balanced to create net CO₂ decrease at night despite plant respiration
     
     [Header("Environmental Limits & Warnings")]
     [Tooltip("O₂ below this % shows warning (normal: 19-21%)")]
@@ -112,8 +112,9 @@ public class AtmosphereManager : MonoBehaviour
 
     // Biochemical model
     private List<GasExchanger> exchangers = new List<GasExchanger>();
+    private List<PlantAgent> plantAgents = new List<PlantAgent>();  // 新的PlantAgent系统
     private float dayTimer = 0f;
-    private int currentDay = 0;
+    public int currentDay = 0;
 
     void Awake()
     {
@@ -181,57 +182,103 @@ public class AtmosphereManager : MonoBehaviour
     
     /// <summary>
     /// Process continuous gas exchange every frame using CORRECT MOLAR CALCULATION
-    /// Step A: Calculate time fraction
-    /// Step B: Integrate net flux into moles
-    /// Step C: Recalculate total moles (done in UpdatePercentagesFromMoles)
-    /// Step D: Calculate new percentages (done in UpdatePercentagesFromMoles)
+    /// NOTE: Now only processes GasExchanger entities (Animals/Humans)
+    /// Plants are handled by PlantAgent system directly
     /// </summary>
     void ProcessContinuousGasExchange()
     {
-        // ========== STEP A: Calculate Time Fraction ==========
         // Time Fraction = Time.deltaTime / secondsPerDay
-        // This accounts for speed multiplier automatically since deltaTime is already scaled
         float timeFraction = Time.deltaTime / secondsPerDay;
         
-        // ========== Calculate Net Flux Rates (mol/day) ==========
-        float netO2Rate = 0f;  // mol/day
+        // Calculate Net Flux Rates (mol/day) - Only from GasExchanger (Animals/Humans)
+        float netO2Rate = 0f; // mol/day
         float netCO2Rate = 0f; // mol/day
         
-        // Sum up all entity contributions
+        int skippedTrees = 0, skippedGrass = 0, processedAnimals = 0, processedHumans = 0;
+        
+        // Sum up only non-plant entity contributions
         foreach (GasExchanger exchanger in exchangers)
         {
             if (exchanger != null)
             {
+                // Skip plant entities - they use PlantAgent system now
+                if (exchanger.entityType == GasExchanger.EntityType.Tree)
+                {
+                    skippedTrees++;
+                    continue;
+                }
+                if (exchanger.entityType == GasExchanger.EntityType.Grass)
+                {
+                    skippedGrass++;
+                    continue;
+                }
+                
                 netO2Rate += exchanger.GetCurrentO2Rate();
                 netCO2Rate += exchanger.GetCurrentCO2Rate();
+                
+                if (exchanger.entityType == GasExchanger.EntityType.Animal) processedAnimals++;
+                if (exchanger.entityType == GasExchanger.EntityType.Human) processedHumans++;
             }
+        }
+        
+        // Debug log what was processed vs skipped (every 120 frames)
+        if (Time.frameCount % 120 == 0)
+        {
+            Debug.Log($"[ProcessGasExchange] Skipped: {skippedTrees} trees + {skippedGrass} grass | " +
+                      $"Processed: {processedAnimals} animals + {processedHumans} humans | " +
+                      $"NetCO2 before ocean: {netCO2Rate:F2} mol/day");
         }
         
         // Add ocean CO₂ absorption (ocean acts as carbon sink)
         if (oceanAbsorptionRate > 0f)
         {
             netCO2Rate -= oceanAbsorptionRate;  // Negative = removes CO₂ from atmosphere
+            
+            // Debug log ocean sink activity (every 60 frames = ~1 second)
+            if (Time.frameCount % 60 == 0)
+            {
+                Debug.Log($"[Ocean Sink] Removing {oceanAbsorptionRate:F2} mol/day CO₂ " +
+                          $"(Current CO₂: {carbonDioxideMoles:F1} mol)");
+            }
         }
         
-        // ========== STEP B: Integrate Net Flux into Moles ==========
+        // Integrate Net Flux into Moles
         // O₂ Moles += (Net O₂ Rate × Time Fraction × Speed Multiplier)
         // CO₂ Moles += (Net CO₂ Rate × Time Fraction × Speed Multiplier)
         float oxygenMolesChange = netO2Rate * timeFraction * speedMultiplier;
         float co2MolesChange = netCO2Rate * timeFraction * speedMultiplier;
         
+        // DEBUG: Track O₂ before ProcessGasExchange modification (every 60 frames)
+        if (Time.frameCount % 60 == 0)
+        {
+            Debug.Log($"[AtmosphereManager] BEFORE ProcessGasExchange: O₂={oxygenMoles:F3} mol | " +
+                      $"About to add: {oxygenMolesChange:F10} mol from animals/ocean");
+        }
+        
         // Update MOLAR COUNTS (source of truth)
         oxygenMoles += oxygenMolesChange;
         carbonDioxideMoles += co2MolesChange;
+        
+        // DEBUG: Track O₂ after ProcessGasExchange modification (every 60 frames)
+        if (Time.frameCount % 60 == 0)
+        {
+            Debug.Log($"[AtmosphereManager] AFTER ProcessGasExchange: O₂={oxygenMoles:F3} mol");
+        }
+        
+        // Debug log actual changes (every 120 frames = ~2 seconds)
+        if (Time.frameCount % 120 == 0)
+        {
+            Debug.Log($"[Atmosphere] Frame changes: O₂ {oxygenMolesChange:+0.000000;-0.000000} mol, " +
+                      $"CO₂ {co2MolesChange:+0.000000;-0.000000} mol | " +
+                      $"Total: O₂={oxygenMoles:F0} mol, CO₂={carbonDioxideMoles:F0} mol");
+        }
         
         // Clamp to prevent negative values
         oxygenMoles = Mathf.Max(0f, oxygenMoles);
         carbonDioxideMoles = Mathf.Max(0f, carbonDioxideMoles);
         
-        // Water vapor changes can be added here later (evaporation/rainfall)
-        // waterVaporMoles += waterChangeRate * timeFraction * speedMultiplier;
-        
+        // Note: PlantAgent handles plant gas exchange directly in their Update()
         // Note: N₂ and Ar are INERT and NEVER change!
-        // Step C & D (recalculate total and percentages) happen in UpdatePercentagesFromMoles()
     }
     
     /// <summary>
@@ -333,6 +380,30 @@ public class AtmosphereManager : MonoBehaviour
     }
     
     /// <summary>
+    /// Register a PlantAgent (新系统)
+    /// </summary>
+    public void RegisterPlantAgent(PlantAgent agent)
+    {
+        if (!plantAgents.Contains(agent))
+        {
+            plantAgents.Add(agent);
+            Debug.Log($"[Atmosphere] Registered PlantAgent #{plantAgents.Count}: {agent.plantType} (biomass={agent.biomass:F1})");
+        }
+        else
+        {
+            Debug.LogWarning($"[Atmosphere] DUPLICATE REGISTRATION BLOCKED: {agent.plantType} already in list!");
+        }
+    }
+    
+    /// <summary>
+    /// Unregister a PlantAgent (called when entity is destroyed)
+    /// </summary>
+    public void UnregisterPlantAgent(PlantAgent agent)
+    {
+        plantAgents.Remove(agent);
+    }
+    
+    /// <summary>
     /// Add a one-time CO₂ spike (e.g., from tree death/burning)
     /// Uses MOLAR calculation (correct method)
     /// </summary>
@@ -413,7 +484,7 @@ public class AtmosphereManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Get current entity counts and total gas exchange rates
+    /// Get current entity counts and total gas exchange rates (旧系统 - 仅GasExchanger)
     /// </summary>
     public void GetEcosystemStats(out int trees, out int grass, out int animals, out int humans, 
                                    out float totalO2, out float totalCO2)
@@ -441,6 +512,75 @@ public class AtmosphereManager : MonoBehaviour
         if (oceanAbsorptionRate > 0f)
         {
             totalCO2 -= oceanAbsorptionRate;
+        }
+    }
+    
+    /// <summary>
+    /// Get ecosystem stats using NEW PlantAgent system (real data)
+    /// Returns actual mol/s rates, UI converts to mol/day for display
+    /// </summary>
+    public void GetEcosystemStatsWithPlantAgents(out int trees, out int grass, out int animals, out int humans,
+                                                   out float totalO2_molPerSec, out float totalCO2_molPerSec)
+    {
+        trees = 0; grass = 0; animals = 0; humans = 0;
+        totalO2_molPerSec = 0f; totalCO2_molPerSec = 0f;
+        
+        float plantO2Total = 0f;
+        float plantCO2Total = 0f;
+        
+        // Calculate PlantAgent contributions (new system - real data)
+        foreach (var agent in plantAgents)
+        {
+            if (agent == null) continue;
+            
+            // Count entities
+            if (agent.plantType == PlantAgent.PlantType.Tree) trees++;
+            else grass++;
+            
+            // Calculate actual gas exchange rate (mol/s) with metabolismScale applied
+            float o2RatePerSec = agent.P_net * agent.metabolismScale;
+            float co2RatePerSec = -agent.P_net * agent.metabolismScale;
+            
+            plantO2Total += o2RatePerSec;
+            plantCO2Total += co2RatePerSec;
+            
+            totalO2_molPerSec += o2RatePerSec;
+            totalCO2_molPerSec += co2RatePerSec;
+        }
+        
+        // Debug log plant contributions (every 120 frames)
+        if (Time.frameCount % 120 == 0 && plantAgents.Count > 0)
+        {
+            Debug.Log($"[Statistics] {plantAgents.Count} PlantAgents registered | {trees} trees + {grass} grass counted | " +
+                      $"O₂: {plantO2Total:F8} mol/s ({plantO2Total * secondsPerDay:F4} mol/day) | " +
+                      $"CO₂: {plantCO2Total:F8} mol/s ({plantCO2Total * secondsPerDay:F4} mol/day)");
+        }
+        
+        // Calculate GasExchanger contributions (old system - animals/humans only)
+        foreach (var exchanger in exchangers)
+        {
+            if (exchanger == null || !exchanger.isAlive) continue;
+            
+            // Only count non-plant entities
+            if (exchanger.entityType == GasExchanger.EntityType.Animal)
+            {
+                animals++;
+                // Convert mol/day to mol/s: rate/day ÷ secondsPerDay
+                totalO2_molPerSec += exchanger.GetCurrentO2Rate() / secondsPerDay;
+                totalCO2_molPerSec += exchanger.GetCurrentCO2Rate() / secondsPerDay;
+            }
+            else if (exchanger.entityType == GasExchanger.EntityType.Human)
+            {
+                humans++;
+                totalO2_molPerSec += exchanger.GetCurrentO2Rate() / secondsPerDay;
+                totalCO2_molPerSec += exchanger.GetCurrentCO2Rate() / secondsPerDay;
+            }
+        }
+        
+        // Add ocean absorption (mol/day → mol/s)
+        if (oceanAbsorptionRate > 0f)
+        {
+            totalCO2_molPerSec -= oceanAbsorptionRate / secondsPerDay;
         }
     }
     

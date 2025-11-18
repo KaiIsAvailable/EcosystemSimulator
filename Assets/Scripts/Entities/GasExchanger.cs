@@ -1,3 +1,4 @@
+//这个脚本负责让植物（树/草）发射气体粒子，模拟光合作用和呼吸作用的视觉效果。
 using UnityEngine;
 
 public class GasExchanger : MonoBehaviour
@@ -13,6 +14,10 @@ public class GasExchanger : MonoBehaviour
     
     [Tooltip("CO₂ consumed (-) or produced (+) per day")]
     public float co2Rate = 0f;
+    
+    [Header("Metabolism Scale")]
+    [Tooltip("全局代谢速率缩放因子 (校准到与PlantAgent匹配的生态速率)")]
+    public float metabolismScale = 0.00636f;  // 与PlantAgent保持一致的校准系数
     
     [Header("Day/Night Behavior")]
     [Tooltip("If true, only exchanges gas during daylight (photosynthesis)")]
@@ -115,8 +120,8 @@ public class GasExchanger : MonoBehaviour
         }
         else
         {
-            // Animals and humans: respiration 24/7
-            rate = oxygenRate;
+            // Animals and humans: respiration 24/7 (apply metabolismScale for calibration)
+            rate = oxygenRate * metabolismScale;
         }
         
         return rate;
@@ -160,8 +165,8 @@ public class GasExchanger : MonoBehaviour
         }
         else
         {
-            // Animals and humans: produce CO₂ 24/7
-            rate = co2Rate;
+            // Animals and humans: produce CO₂ 24/7 (apply metabolismScale for calibration)
+            rate = co2Rate * metabolismScale;
         }
         
         return rate;

@@ -1,3 +1,4 @@
+//这个脚本控制气体粒子的行为：从生成、飘动、淡出，到最终被大气吸收。
 using UnityEngine;
 
 public class GasParticle : MonoBehaviour
@@ -60,6 +61,11 @@ public class GasParticle : MonoBehaviour
     {
         absorbed = true;
 
+        // 🛑 DISABLED: Visual particles should NOT modify atmosphere
+        // PlantAgent already handles all gas exchange accurately
+        // This was causing massive CO₂ increases (+460 mol/day)
+        
+        /*
         // Add this gas to the atmosphere manager
         if (AtmosphereManager.Instance != null)
         {
@@ -72,5 +78,6 @@ public class GasParticle : MonoBehaviour
                 AtmosphereManager.Instance.AddCarbonDioxide();
             }
         }
+        */
     }
 }

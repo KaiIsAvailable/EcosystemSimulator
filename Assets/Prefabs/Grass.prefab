@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 597315107291645068}
   - component: {fileID: -7049636629033538549}
   - component: {fileID: -2213367140393274577}
+  - component: {fileID: 4528371953211687643}
   m_Layer: 0
   m_Name: Grass
   m_TagString: Untagged
@@ -133,7 +134,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8216876298259141216}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b9cf4afdf039ce647b1882550125e805, type: 3}
   m_Name: 
@@ -163,9 +164,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_ShadowGroup: 0
-  m_Priority: 0
+  m_Priority: 1
   m_ComponentVersion: 5
-  m_HasRenderer: 0
+  m_HasRenderer: 1
   m_UseRendererSilhouette: 1
   m_CastsShadows: 1
   m_SelfShadows: 0
@@ -191,15 +192,44 @@ MonoBehaviour:
     m_TrimEdge: 0.01
     m_FlipX: 0
     m_FlipY: 0
-    m_InitialTrim: 0.01
+    m_InitialTrim: 0
   m_CastingOption: 1
-  m_PreviousTrimEdge: 0
-  m_PreviousEdgeProcessing: -1
-  m_PreviousShadowCastingSource: -1
-  m_PreviousShadowShape2DSource: {fileID: 0}
+  m_PreviousTrimEdge: 0.01
+  m_PreviousEdgeProcessing: 1
+  m_PreviousShadowCastingSource: 2
+  m_PreviousShadowShape2DSource: {fileID: 947558742130227057}
   references:
     version: 2
     RefIds:
     - rid: 2340870476025036868
       type: {class: ShadowShape2DProvider_SpriteRenderer, ns: UnityEngine.Rendering.Universal, asm: Unity.RenderPipelines.Universal.2D.Runtime}
       data: 
+--- !u!114 &4528371953211687643
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8216876298259141216}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 34e11c55877b89447b830623c9cd102c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  plantType: 1
+  R_base: 0.015
+  Q10_factor: 2.5
+  L_comp_ratio: 0.1
+  L_sat_ratio: 0.9
+  P_max: 0.25
+  metabolismScale: 0.1
+  biomass: 10
+  verticalLayerH: 0
+  localTemperature: 20
+  localLight: 1
+  R_total: 0
+  P_gross: 0
+  P_net: 0
+  minBiomass: 0.1
+  enableDeath: 1
+  autoRegister: 1
