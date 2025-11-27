@@ -1,0 +1,195 @@
+═══════════════════════════════════════════════════════════════
+  ECOSYSTEM GRAPH UI SETUP GUIDE
+═══════════════════════════════════════════════════════════════
+
+Two graph options are available:
+
+1. LINE GRAPH (EcosystemGraphUI) - Shows trends over time
+2. BAR CHART (BarChartUI) - Shows current breakdown
+
+═══════════════════════════════════════════════════════════════
+OPTION 1: LINE GRAPH SETUP (Real-time trends)
+═══════════════════════════════════════════════════════════════
+
+A. Create Canvas Structure:
+   1. Right-click Hierarchy → UI → Canvas
+   2. Inside Canvas, create:
+      - Panel (name: "GraphPanel")
+      - Button (name: "ToggleButton") - position at edge of screen
+      
+B. Inside GraphPanel, create:
+   1. Empty GameObject: "GraphContainer"
+   2. Text elements:
+      - "O2Label"
+      - "CO2Label"
+      - "TempLabel"
+      - "TimeLabel"
+      
+C. Create Line Renderers:
+   1. Create 3 Empty GameObjects as children of GraphContainer:
+      - "O2Line" → Add Component → Line Renderer
+      - "CO2Line" → Add Component → Line Renderer
+      - "TempLine" → Add Component → Line Renderer
+   
+   2. For each Line Renderer, set:
+      - Material: Create new material with Sprites/Default shader
+      - Width: 2
+      - Position Count: 0 (will be set by script)
+
+D. Attach Script:
+   1. Select GraphPanel
+   2. Add Component → EcosystemGraphUI
+   3. Drag references:
+      - Graph Panel → GraphPanel
+      - Toggle Button → ToggleButton
+      - O2 Line → O2Line GameObject
+      - CO2 Line → CO2Line GameObject
+      - Temp Line → TempLine GameObject
+      - All labels → corresponding Text elements
+   
+   4. Set colors:
+      - O2 Color: Green (50, 200, 75)
+      - CO2 Color: Red (200, 75, 50)
+      - Temp Color: Orange (255, 180, 50)
+
+E. Toggle Button Setup:
+   1. Select ToggleButton
+   2. Add child Text element (name: "Text")
+   3. Set text to "◄" or "►"
+   4. In EcosystemGraphUI, drag this Text to "Toggle Button Text"
+
+═══════════════════════════════════════════════════════════════
+OPTION 2: BAR CHART SETUP (Current breakdown) - AUTO-CREATE
+═══════════════════════════════════════════════════════════════
+
+✨ NEW: Bars are created AUTOMATICALLY by the script!
+
+A. Create Canvas Structure:
+   1. Right-click Hierarchy → UI → Canvas
+   2. Inside Canvas, create Panel (name: "BarChartPanel")
+   3. Set Panel size:
+      - Anchor: Middle-Right (or anywhere you prefer)
+      - Width: 420
+      - Height: 350
+
+B. Attach Script (This does everything!):
+   1. Select BarChartPanel
+   2. Add Component → BarChartUI
+   3. In Inspector, drag BarChartPanel's RectTransform to "Container" field
+   
+   4. Optional settings:
+      - Max Bar Scale: 30 (full bar = 30 mol/day)
+      - Bar Height: 45
+      - Bar Spacing: 5
+      - Update Interval: 0.5 seconds
+
+C. Done! Press Play
+   - Script automatically creates:
+     ✅ Title bar with day/time
+     ✅ 5 bars with emoji icons
+     ✅ Background and fill images
+     ✅ Labels with detailed info
+     ✅ Text shadows for readability
+
+═══════════════════════════════════════════════════════════════
+SUPER QUICK SETUP (3 Steps!)
+═══════════════════════════════════════════════════════════════
+
+BAR CHART (Recommended - User Friendly):
+
+1. Create UI → Canvas
+2. Create UI → Panel (inside Canvas, name: "BarChartPanel")
+3. Select Panel → Add Component → BarChartUI
+4. Drag Panel to "Container" field in Inspector
+5. Press Play - Done! Everything auto-creates!
+
+What you'll see:
+┌─────────────────────────────────────────┐
+│ 🌍 ECOSYSTEM GAS EXCHANGE | Day 5 14:32 │ ← Title
+├─────────────────────────────────────────┤
+│ ☀️ Photosynthesis [████░░░] +2.85 O₂   │ ← Green bar
+│ 🍃 Plant Resp     [██░░░░░] -0.84 O₂   │ ← Red bar
+│ 🐾 Animals (30)   [██████░] -11.25 O₂  │ ← Orange bar
+│ 👤 Humans (1)     [█░░░░░░] -0.84 O₂   │ ← Blue bar
+│ 🌊 Ocean          [███████] -20.00 CO₂ │ ← Cyan bar
+└─────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════
+RECOMMENDED LAYOUT
+═══════════════════════════════════════════════════════════════
+
+Position on screen:
+- Bar Chart: Right side (anchored to right edge)
+- Line Graph: Bottom half (anchored to bottom)
+- Toggle Button: Small button at edge (20x40 pixels)
+
+Colors:
+- Photosynthesis: Green #33CC4B
+- Respiration: Red #CC4B33
+- Animals: Orange #CC7F33
+- Humans: Blue #4D7FE6
+- Ocean: Cyan #33B3CC
+
+═══════════════════════════════════════════════════════════════
+TESTING
+═══════════════════════════════════════════════════════════════
+
+1. Press Play
+2. Bars should animate showing current gas exchange rates
+3. Line graph should draw over time showing trends
+4. Click toggle button to hide/show panel
+5. Values update in real-time as simulation runs
+
+═══════════════════════════════════════════════════════════════
+WHAT EACH BAR SHOWS
+═══════════════════════════════════════════════════════════════
+
+☀️ Photosynthesis (Green)
+   - Plants converting sunlight to O₂
+   - MAX during day, ZERO at night
+   - Shows tree and grass counts
+
+🍃 Plant Respiration (Red)
+   - Plants consuming O₂ for energy
+   - Works 24/7 (day and night!)
+   - Always negative value
+
+🐾 Animals (Orange)
+   - Animals breathing
+   - Consuming O₂, producing CO₂
+   - Shows animal count
+
+👤 Humans (Blue)
+   - Humans breathing
+   - Consuming O₂, producing CO₂
+   - Shows human count
+
+🌊 Ocean (Cyan)
+   - Ocean absorbing CO₂
+   - Natural carbon sink
+   - Constant rate
+
+═══════════════════════════════════════════════════════════════
+TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════
+
+❌ "Bars not appearing"
+   → Check "Container" field has BarChartPanel assigned
+   → Verify panel is active in Hierarchy
+   → Look for errors in Console
+
+❌ "All bars show 0"
+   → Wait 30 seconds for data to accumulate
+   → Check AtmosphereManager exists in scene
+   → Verify animals/humans have metabolism components
+
+❌ "NullReferenceException error"
+   → AtmosphereManager must exist in scene
+   → SunMoonController must exist in scene
+   → Container field must be assigned
+
+❌ "Title not updating"
+   → Check SunMoonController reference
+   → Verify game is running (not paused)
+
+═══════════════════════════════════════════════════════════════

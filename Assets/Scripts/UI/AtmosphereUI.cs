@@ -1,8 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-public class AtmosphereUI : MonoBehaviour
-{
+public class AtmosphereUI : MonoBehaviour{
     [Header("Ecosystem Stats UI (Optional)")]
     public Text ecosystemStatsText;
     public Text titleText;
@@ -63,13 +62,26 @@ public class AtmosphereUI : MonoBehaviour
             Debug.Log($"[AtmosphereUI] Reading O₂ from atmosphere: {atmosphere.oxygenMoles:F3} mol");
         }
 
-        // Get real data from PlantAgent system
+        // Get real data from PlantAgent system with breakdown
         atmosphere.GetEcosystemStatsWithPlantAgents(out int trees, out int grass, out int animals, out int humans,
-                                                      out float totalO2_molPerSec, out float totalCO2_molPerSec);
+                                                      out float totalO2_molPerSec, out float totalCO2_molPerSec,
+                                                      out float plantPhotosynthesisO2, out float plantRespirationO2,
+                                                      out float animalO2, out float animalCO2,
+                                                      out float humanO2, out float humanCO2,
+                                                      out float oceanCO2);
 
         // Convert mol/s to mol/day for display
         float totalO2_molPerDay = totalO2_molPerSec * atmosphere.secondsPerDay;
         float totalCO2_molPerDay = totalCO2_molPerSec * atmosphere.secondsPerDay;
+        
+        // Breakdown in mol/day
+        float plantPhotoO2_day = plantPhotosynthesisO2 * atmosphere.secondsPerDay;
+        float plantRespO2_day = plantRespirationO2 * atmosphere.secondsPerDay;
+        float animalO2_day = animalO2 * atmosphere.secondsPerDay;
+        float animalCO2_day = animalCO2 * atmosphere.secondsPerDay;
+        float humanO2_day = humanO2 * atmosphere.secondsPerDay;
+        float humanCO2_day = humanCO2 * atmosphere.secondsPerDay;
+        float oceanCO2_day = oceanCO2 * atmosphere.secondsPerDay;
 
         // Determine if values are significant enough to show
         bool o2IsZero = Mathf.Abs(totalO2_molPerDay) < 0.001f;
@@ -94,7 +106,13 @@ public class AtmosphereUI : MonoBehaviour
 
         string gasExchangeSection = $"<b>GAS EXCHANGE (Real-time)</b>\n" +
                                         $"{o2Arrow} Net O₂: {o2Display}\n" +
-                                        $"{co2Arrow} Net CO₂: {co2Display}\n";
+                                        $"{co2Arrow} Net CO₂: {co2Display}\n" +
+                                        $"\n<b>Breakdown:</b>\n" +
+                                        $" Photosynthesis: +{plantPhotoO2_day:F2} O₂, {-plantPhotoO2_day:F2} CO₂\n" +
+                                        $" Plant Respiration: {plantRespO2_day:F2} O₂, +{-plantRespO2_day:F2} CO₂\n" +
+                                        $" Animals ({animals}): {animalO2_day:F2} O₂, +{animalCO2_day:F2} CO₂\n" +
+                                        $" Humans ({humans}): {humanO2_day:F2} O₂, +{humanCO2_day:F2} CO₂\n" +
+                                        $" Ocean: {oceanCO2_day:F2} CO₂\n";
 
         string atmosphereSection = $"<b>ATMOSPHERE</b>\n" +
                                     $"H₂O: {atmosphere.waterVapor:F3}% ({atmosphere.waterVaporMoles:F0} mol)\n" +

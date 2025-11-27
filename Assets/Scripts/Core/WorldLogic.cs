@@ -77,7 +77,7 @@ public class WorldLogic : MonoBehaviour
     {
         if (!oceanWaterPrefab || !spawnOcean)
         {
-            Debug.Log("[WorldLogic] Ocean disabled or no ocean prefab assigned");
+            //Debug.Log("[WorldLogic] Ocean disabled or no ocean prefab assigned");
             oceanTopY = areaCenter.y - halfExtents.y; // Bottom of map
             return;
         }
@@ -98,8 +98,8 @@ public class WorldLogic : MonoBehaviour
         // Scale ocean to cover bottom portion of map
         ocean.transform.localScale = new Vector3(oceanWidth, oceanHeight, 1f);
         
-        Debug.Log($"[WorldLogic] Spawned ocean: width={oceanWidth:F1}, height={oceanHeight:F1}, top Y={oceanTopY:F2}");
-        Debug.Log($"[WorldLogic] Entities will spawn above Y={oceanTopY:F2} to avoid water");
+        //Debug.Log($"[WorldLogic] Spawned ocean: width={oceanWidth:F1}, height={oceanHeight:F1}, top Y={oceanTopY:F2}");
+        //Debug.Log($"[WorldLogic] Entities will spawn above Y={oceanTopY:F2} to avoid water");
     }
 
     void SpawnTrees()
@@ -165,7 +165,7 @@ public class WorldLogic : MonoBehaviour
                 AtmosphereManager.Instance.UnregisterExchanger(oldExchanger);
             }
             Destroy(oldExchanger);
-            Debug.LogWarning($"[WorldLogic] Removed GasExchanger from {plant.name} - plants use PlantAgent now!");
+            //Debug.LogWarning($"[WorldLogic] Removed GasExchanger from {plant.name} - plants use PlantAgent now!");
         }
         
         // Check if PlantAgent already exists (from prefab)
@@ -196,7 +196,7 @@ public class WorldLogic : MonoBehaviour
             agent.biomass = 5f;
         }
         
-        Debug.Log($"[WorldLogic] Added PlantAgent to {plant.name}: type={type}, metabolismScale={agent.metabolismScale}");
+        //Debug.Log($"[WorldLogic] Added PlantAgent to {plant.name}: type={type}, metabolismScale={agent.metabolismScale}");
         
         // Disable BiomassEnergy if it exists (avoid conflicts)
         var biomassEnergy = plant.GetComponent<BiomassEnergy>();

@@ -16,6 +16,7 @@ GameObject:
   - component: {fileID: 1322076820243676467}
   - component: {fileID: -8689249140359428571}
   - component: {fileID: -8871967679949524613}
+  - component: {fileID: 3580869197733667111}
   m_Layer: 3
   m_Name: Animal
   m_TagString: Untagged
@@ -228,7 +229,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6713439815758559079}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b9cf4afdf039ce647b1882550125e805, type: 3}
   m_Name: 
@@ -298,3 +299,29 @@ MonoBehaviour:
     - rid: 2340870476025036867
       type: {class: ShadowShape2DProvider_SpriteRenderer, ns: UnityEngine.Rendering.Universal, asm: Unity.RenderPipelines.Universal.2D.Runtime}
       data: 
+--- !u!114 &3580869197733667111
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6713439815758559079}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11cca85df2735fb4691d579749a02999, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  biomass: 30
+  maxBiomass: 60
+  basalMetabolicRate: 0.00002
+  Q10_factor: 2
+  comfortTemperature: 22
+  currentActivity: 0
+  metabolismScale: 0.1
+  eatingAmount: 5
+  searchRadius: 3
+  searchInterval: 3
+  trophicEfficiency: 0.1
+  isAlive: 1
+  hungerThreshold: 20
+  totalRespiration: 0

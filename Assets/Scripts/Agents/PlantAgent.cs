@@ -79,12 +79,12 @@ public class PlantAgent : MonoBehaviour
 
         if (!sunMoon)
         {
-            Debug.LogError("[PlantAgent] No SunMoonController found in scene!");
+            //Debug.LogError("[PlantAgent] No SunMoonController found in scene!");
         }
 
         if (!atmosphere)
         {
-            Debug.LogError("[PlantAgent] No AtmosphereManager found in scene!");
+            //Debug.LogError("[PlantAgent] No AtmosphereManager found in scene!");
         }
         else
         {
@@ -194,7 +194,7 @@ public class PlantAgent : MonoBehaviour
             atmosphere.oxygenMoles += o2Accumulator;
             if (Time.frameCount % 60 == 0)
             {
-                Debug.Log($"[O₂ Applied] {o2Accumulator:F4} mol | New O₂: {atmosphere.oxygenMoles:F2} mol");
+                //Debug.Log($"[O₂ Applied] {o2Accumulator:F4} mol | New O₂: {atmosphere.oxygenMoles:F2} mol");
             }
             o2Accumulator = 0f;
         }
@@ -209,12 +209,12 @@ public class PlantAgent : MonoBehaviour
         if (plantType == PlantType.Tree && Time.frameCount % 120 == 0)
         {
             string nightMarker = sunMoon.GetPhotosynthesisEfficiency() == 0f ? "[NIGHT]" : "";
-            Debug.Log($"[PlantAgent {nightMarker}] {sunMoon.currentTimeOfDay} {sunMoon.hours:00}:{sunMoon.minutes:00} | " +
-                      $"Temp={localTemperature:F1}°C | PhotoEff={sunMoon.GetPhotosynthesisEfficiency():F3} | " +
-                      $"P_net={P_net:F8} | metabolismScale={metabolismScale:F6} | " +
-                      $"Time.deltaTime={Time.deltaTime:F6} | " +
-                      $"O2Δ={o2Change:F10} mol/frame | CO2Δ={co2Change:F10} mol/frame | " +
-                      $"Atmosphere CO2={atmosphere.carbonDioxideMoles:F1} mol");
+            //Debug.Log($"[PlantAgent {nightMarker}] {sunMoon.currentTimeOfDay} {sunMoon.hours:00}:{sunMoon.minutes:00} | " +
+            //          $"Temp={localTemperature:F1}°C | PhotoEff={sunMoon.GetPhotosynthesisEfficiency():F3} | " +
+            //          $"P_net={P_net:F8} | metabolismScale={metabolismScale:F6} | " +
+            //          $"Time.deltaTime={Time.deltaTime:F6} | " +
+            //          $"O2Δ={o2Change:F10} mol/frame | CO2Δ={co2Change:F10} mol/frame | " +
+            //          $"Atmosphere CO2={atmosphere.carbonDioxideMoles:F1} mol");
         }
 
         atmosphere.oxygenMoles = Mathf.Max(0f, atmosphere.oxygenMoles);
@@ -230,7 +230,7 @@ public class PlantAgent : MonoBehaviour
 
     void Die()
     {
-        Debug.Log($"[PlantAgent] {gameObject.name} died due to energy depletion (biomass: {biomass:F2})");
+        //Debug.Log($"[PlantAgent] {gameObject.name} died due to energy depletion (biomass: {biomass:F2})");
         
         // TODO: Play death animation
         // TODO: Drop resources
@@ -247,7 +247,7 @@ public class PlantAgent : MonoBehaviour
             if (o2Accumulator != 0f)
             {
                 atmosphere.oxygenMoles += o2Accumulator;
-                Debug.Log($"[Plant Destroyed] Applied remaining O₂: {o2Accumulator:F6} mol");
+                //Debug.Log($"[Plant Destroyed] Applied remaining O₂: {o2Accumulator:F6} mol");
             }
             if (co2Accumulator != 0f)
             {
