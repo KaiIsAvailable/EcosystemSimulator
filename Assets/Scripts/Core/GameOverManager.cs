@@ -11,6 +11,8 @@ public class GameOverManager : MonoBehaviour
     [Header("Game Over Detection")]
     [Tooltip("Check for human death every X seconds")]
     public float checkInterval = 0.5f;
+    [Tooltip("Minimum number of living humans required to continue the simulation. If living humans < this value, Game Over triggers.")]
+    public int minHumansToContinue = 1;
     
     [Header("Game Over UI")]
     public GameObject gameOverPanel;
@@ -28,6 +30,9 @@ public class GameOverManager : MonoBehaviour
     private float gameStartTime;
     private bool gameOver = false;
     private float checkTimer = 0f;
+    // Track whether the simulation has ever seen a human so we don't trigger
+    // Game Over immediately in scenes without humans.
+    private bool everHadHuman = false;
     
     void Start()
     {
@@ -36,6 +41,12 @@ public class GameOverManager : MonoBehaviour
         // Hide game over UI at start
         if (gameOverPanel != null)
             gameOverPanel.SetActive(false);
+
+        // Auto-wire buttons if assigned
+        if (restartButton != null) restartButton.onClick.AddListener(RestartGame);
+        if (quitButton != null) quitButton.onClick.AddListener(QuitGame);
+        
+        Debug.Log("[GameOverManager] Initialized. Monitoring for human death...");
     }
     
     void Update()
@@ -53,34 +64,65 @@ public class GameOverManager : MonoBehaviour
     
     void CheckHumanAlive()
     {
-        // Find all BiomassEnergy components
-        BiomassEnergy[] allEntities = FindObjectsByType<BiomassEnergy>(FindObjectsSortMode.None);
-        
-        bool humanFound = false;
-        bool humanAlive = false;
-        
-        foreach (BiomassEnergy entity in allEntities)
+        // Count living humans using HumanMetabolism when available.
+        int livingHumans = 0;
+
+        HumanMetabolism[] humans = FindObjectsOfType<HumanMetabolism>();
+        foreach (var h in humans)
         {
-            // Check if this is the human
-            if (entity.entityType == BiomassEnergy.EntityType.Carnivore)
+            if (h != null && h.isAlive) livingHumans++;
+        }
+
+        // Fallback: include any BiomassEnergy carnivores that don't have a HumanMetabolism component
+        BiomassEnergy[] allEntities = FindObjectsOfType<BiomassEnergy>();
+        foreach (var be in allEntities)
+        {
+            if (be == null) continue;
+
+            // Only consider carnivores
+            if (be.entityType != BiomassEnergy.EntityType.Carnivore) continue;
+
+            // If this GameObject already has a HumanMetabolism component we already counted it
+            if (be.GetComponent<HumanMetabolism>() != null) continue;
+
+            if (be.isAlive) livingHumans++;
+        }
+
+        // Debug: report living humans and threshold
+        string names = "";
+        foreach (var h in humans)
+        {
+            if (h != null && h.isAlive)
             {
-                humanFound = true;
-                if (entity.isAlive)
-                {
-                    humanAlive = true;
-                    break;
-                }
+                names += h.gameObject.name + ", ";
             }
         }
-        
-        // Trigger game over if human is dead
-        if (humanFound && !humanAlive)
+        // Include fallback carnivores without HumanMetabolism
+        foreach (var be in allEntities)
+        {
+            if (be == null) continue;
+            if (be.entityType != BiomassEnergy.EntityType.Carnivore) continue;
+            if (be.GetComponent<HumanMetabolism>() != null) continue;
+            if (be.isAlive)
+            {
+                names += be.gameObject.name + ", ";
+            }
+        }
+
+        Debug.Log($"[GameOverManager] LivingHumans={livingHumans}, MinRequired={minHumansToContinue}. Humans: {names}");
+
+        // Mark that we've seen a human if any are currently alive
+        if (livingHumans > 0) everHadHuman = true;
+
+        // Trigger game over only when we've seen at least one human previously
+        // and there are now zero living humans.
+        if (everHadHuman && livingHumans == 0)
         {
             TriggerGameOver();
         }
     }
     
-    void TriggerGameOver()
+    public void TriggerGameOver()
     {
         if (gameOver) return;
         
@@ -110,20 +152,30 @@ public class GameOverManager : MonoBehaviour
     
     public void RestartGame()
     {
-        Debug.Log("[GameOver] Restarting game...");
-        Time.timeScale = 1f;
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        Debug.Log("[GameOverManager] RestartGame() called!");
+        
+        // Use GameStartManager's restart to skip start screen
+        if (GameStartManager.Instance != null)
+        {
+            GameStartManager.Instance.RestartGame();
+        }
+        else
+        {
+            // Fallback if no GameStartManager
+            Time.timeScale = 1f;
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        }
     }
     
     public void QuitGame()
     {
-        Debug.Log("[GameOver] Quitting game...");
+        Debug.Log("[GameOverManager] QuitGame() called!");
         
-#if UNITY_EDITOR
-        UnityEditor.EditorApplication.isPlaying = false;
-#else
-        Application.Quit();
-#endif
+        #if UNITY_EDITOR
+                UnityEditor.EditorApplication.isPlaying = false;
+        #else
+                Application.Quit();
+        #endif
     }
     
     string FormatTime(float seconds)
@@ -132,4 +184,11 @@ public class GameOverManager : MonoBehaviour
         int secs = Mathf.FloorToInt(seconds % 60f);
         return $"{minutes}m {secs}s";
     }
+
+    public void CloseGameOver()
+    {
+        gameOverPanel.SetActive(false);
+        Time.timeScale = 1f;
+    }
+
 }

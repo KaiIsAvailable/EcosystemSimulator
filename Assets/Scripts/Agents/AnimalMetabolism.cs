@@ -8,9 +8,17 @@ using UnityEngine;
 public class AnimalMetabolism : MonoBehaviour
 {
     [Header("Physical Properties")]
-    [Tooltip("Body mass in kg")]
+    [Tooltip("Body mass in kg (the car frame)")]
     public float biomass = 30f;  // Smaller animals (deer, rabbit)
     public float maxBiomass = 60f;
+    
+    [Header("Hunger System (Gas Tank)")]
+    [Tooltip("Current hunger level (fuel in tank)")]
+    public float hunger = 50f;
+    [Tooltip("Maximum hunger capacity (tank size)")]
+    public float maxHunger = 100f;
+    [Tooltip("Hunger depletes every second (engine always burns gas)")]
+    public float hungerDepletionRate = 0.2f;  // Slower depletion: 0.2 hunger per second (was 1.0)
     
     [Header("Basal Metabolism")]
     [Tooltip("Base O₂ consumption at rest (mol/s/kg at 20°C)")]
@@ -40,18 +48,31 @@ public class AnimalMetabolism : MonoBehaviour
     
     [Header("Eating Behavior")]
     [Tooltip("How much biomass to consume when eating")]
-    public float eatingAmount = 5f;
-    [Tooltip("Search radius to find food")]
-    public float searchRadius = 3f;
+    public float eatingAmount = 10f;  // Eat 10kg per bite
     [Tooltip("How often to search for food (seconds)")]
     public float searchInterval = 3f;
-    [Tooltip("Trophic efficiency (10% energy transfer)")]
-    [Range(0.05f, 0.2f)]
-    public float trophicEfficiency = 0.1f;
+    [Tooltip("Trophic efficiency (100% means eating 10kg grass = 10 hunger, but capped at maxHunger)")]
+    [Range(0.05f, 1.0f)]
+    public float trophicEfficiency = 1.0f;  // 100% efficiency: eating 10kg grass = 10 hunger, but hunger gain is +50
+    
+    [Header("Movement")]
+    [Tooltip("How fast the animal moves")]
+    public float moveSpeed = 1.5f;
+    [Tooltip("How close to get before eating (eating range)")]
+    public float eatingRange = 0.3f;
+    [Tooltip("Large search radius to find food from far away")]
+    public float visionRadius = 10f;
+    [Tooltip("Wandering enabled when not hungry")]
+    public bool enableWandering = true;
+    [Tooltip("How far to wander randomly")]
+    public float wanderRadius = 5f;
     
     [Header("Status")]
     public bool isAlive = true;
-    public float hungerThreshold = 20f;
+    
+    [Header("Identification")]
+    public int animalID = 0;
+    private static int nextAnimalID = 1;
     
     [Header("Debug Info")]
     public float totalRespiration = 0f;  // mol O₂/s
@@ -63,12 +84,22 @@ public class AnimalMetabolism : MonoBehaviour
     private float o2Accumulator = 0f;
     private float co2Accumulator = 0f;
     private const float ACCUMULATOR_THRESHOLD = 0.01f;
+    private PlantAgent targetPlant = null;  // Plant the animal is moving towards
+    private Vector2 wanderTarget;  // Random position to wander to
+    private float wanderTimer = 0f;
+    private float wanderInterval = 5f;  // Change wander direction every 5 seconds
     
     void Start()
     {
+        // Assign unique ID to this animal
+        animalID = nextAnimalID++;
+        gameObject.name = $"Animal({animalID})";
+        
         sunMoon = FindAnyObjectByType<SunMoonController>();
         atmosphere = AtmosphereManager.Instance;
         searchTimer = Random.Range(0f, searchInterval);
+        wanderTimer = Random.Range(0f, wanderInterval);
+        SetNewWanderTarget();
         
         if (atmosphere != null)
         {
@@ -81,22 +112,80 @@ public class AnimalMetabolism : MonoBehaviour
     {
         if (!isAlive) return;
         
+        // Always burn hunger first (engine always runs)
+        BurnHunger();
+        
         CalculateMetabolism();
         ProcessGasExchange();
         
-        if (biomass < hungerThreshold)
+        // If hunger is low, search for food
+        if (hunger < maxHunger * 0.5f)  // Start looking when below 50% (hunger 40-50 triggers search)
         {
-            searchTimer += Time.deltaTime;
-            if (searchTimer >= searchInterval)
+            // Search for new target if we don't have one
+            if (targetPlant == null || targetPlant.biomass < 5f)
             {
-                searchTimer = 0f;
-                currentActivity = ActivityState.Grazing;
-                TryEatPlant();
+                searchTimer += Time.deltaTime;
+                if (searchTimer >= searchInterval)
+                {
+                    searchTimer = 0f;
+                    FindNearestPlant();
+                }
+            }
+            
+            // Move towards target plant
+            if (targetPlant != null)
+            {
+                MoveTowardsPlant();
+            }
+        }
+        else
+        {
+            // Not hungry (hunger >= 50%) - wander around
+            targetPlant = null;
+            
+            if (enableWandering)
+            {
+                Wander();
+            }
+            else
+            {
                 currentActivity = ActivityState.Resting;
             }
         }
         
         if (biomass <= 0f) Die();
+    }
+    
+    void BurnHunger()
+    {
+        // Rule 1: Always burn gas (hunger decreases)
+        float hungerBurn = hungerDepletionRate * Time.deltaTime;
+        
+        if (hunger > 0f)
+        {
+            // Tank has fuel - burn hunger
+            hunger -= hungerBurn;
+            hunger = Mathf.Max(0f, hunger);
+        }
+        else
+        {
+            // Rule 2: Empty tank damages car (burn biomass)
+            // If hunger is 0, metabolism starts consuming biomass
+            float biomassBurn = hungerBurn * 0.5f;  // Slower biomass burn
+            biomass -= biomassBurn;
+            biomass = Mathf.Max(0f, biomass);
+            
+            if (Time.frameCount % 60 == 0)
+            {
+                Debug.Log($"[Animal] {gameObject.name} STARVING! Hunger empty, burning biomass: {biomass:F1} kg left");
+                
+                // Notify UI about starvation
+                if (EventNotificationUI.Instance != null)
+                {
+                    EventNotificationUI.Instance.NotifyAnimalStarving($"Animal({animalID})");
+                }
+            }
+        }
     }
     
     void CalculateMetabolism()
@@ -127,13 +216,11 @@ public class AnimalMetabolism : MonoBehaviour
         {
             //Debug.Log($"[AnimalMetabolism] {gameObject.name} | Temp={localTemp:F1}°C | " +
             //          $"M_base={M_base:F8} | C_temp={C_temp:F3} | C_thermoreg={C_thermoreg:F3} | C_activity={C_activity:F1} | " +
-            //          $"totalRespiration={totalRespiration:F8} mol/s | biomass={biomass:F1} kg");
+            //          $"totalRespiration={totalRespiration:F8} mol/s | hunger={hunger:F1}/{maxHunger} | biomass={biomass:F1} kg");
         }
         
-        // Biomass loss (energy consumed)
-        float energyLoss = totalRespiration * Time.deltaTime * metabolismScale;
-        biomass -= energyLoss;
-        biomass = Mathf.Clamp(biomass, 0f, maxBiomass);
+        // Note: Biomass is now only lost when hunger = 0 (handled in BurnHunger)
+        // Metabolism only affects gas exchange, not biomass directly
     }
     
     float GetActivityMultiplier()
@@ -181,17 +268,21 @@ public class AnimalMetabolism : MonoBehaviour
         }
     }
     
-    void TryEatPlant()
+    void FindNearestPlant()
     {
-        Collider2D[] colliders = Physics2D.OverlapCircleAll(transform.position, searchRadius);
+        // Search in large radius to find food
+        Collider2D[] colliders = Physics2D.OverlapCircleAll(transform.position, visionRadius);
         
         PlantAgent nearestPlant = null;
         float nearestDistance = float.MaxValue;
         
         foreach (Collider2D col in colliders)
         {
+            if (col == null || col.gameObject == null) continue;
+            
             PlantAgent plant = col.GetComponent<PlantAgent>();
-            if (plant != null && plant.biomass > 5f)
+            // Look for grass with at least 1kg biomass (lowered from 5kg)
+            if (plant != null && plant.biomass >= 1f && plant.plantType == PlantAgent.PlantType.Grass)
             {
                 float distance = Vector2.Distance(transform.position, col.transform.position);
                 if (distance < nearestDistance)
@@ -204,18 +295,164 @@ public class AnimalMetabolism : MonoBehaviour
         
         if (nearestPlant != null)
         {
-            float biomassTaken = Mathf.Min(eatingAmount, nearestPlant.biomass);
-            nearestPlant.biomass -= biomassTaken;
+            targetPlant = nearestPlant;
+            currentActivity = ActivityState.Walking;
+            Debug.Log($"[Animal] {gameObject.name} found grass with {nearestPlant.biomass:F1}kg at {nearestDistance:F1}m, moving towards it");
+        }
+    }
+    
+    void MoveTowardsPlant()
+    {
+        if (targetPlant == null || targetPlant.gameObject == null) 
+        {
+            targetPlant = null;
+            return;
+        }
+        
+        float distance = Vector2.Distance(transform.position, targetPlant.transform.position);
+        
+        // Close enough to eat
+        if (distance <= eatingRange)
+        {
+            currentActivity = ActivityState.Grazing;
+            EatPlant();
+        }
+        else
+        {
+            // Move towards plant (but stay on land)
+            currentActivity = ActivityState.Walking;
+            Vector2 direction = ((Vector2)targetPlant.transform.position - (Vector2)transform.position).normalized;
+            Vector3 newPosition = transform.position + (Vector3)(direction * moveSpeed * Time.deltaTime);
             
-            float biomassGained = biomassTaken * trophicEfficiency;
-            biomass += biomassGained;
+            // Clamp to land boundaries (prevent walking into ocean)
+            transform.position = WorldBounds.ClampToLand(newPosition);
+        }
+    }
+    
+    void EatPlant()
+    {
+        if (targetPlant == null || targetPlant.gameObject == null)
+        {
+            targetPlant = null;
+            return;
+        }
+        
+        // Eat whatever biomass is left (even if less than 5kg)
+        float biomassTaken = Mathf.Min(eatingAmount, targetPlant.biomass);
+        
+        if (biomassTaken <= 0f)
+        {
+            Debug.Log($"[Animal] {gameObject.name} found empty grass, destroying it");
+            Destroy(targetPlant.gameObject);
+            targetPlant = null;
+            return;
+        }
+        
+        Debug.Log($"[Animal] {gameObject.name} eating {biomassTaken:F1}kg from grass (had {targetPlant.biomass:F1}kg)");
+        
+        targetPlant.biomass -= biomassTaken;
+        
+        Debug.Log($"[Animal] Grass now has {targetPlant.biomass:F1}kg biomass remaining");
+        
+        // Notify UI about eating with unique names
+        if (EventNotificationUI.Instance != null)
+        {
+            string grassName = targetPlant.gameObject.name;
+            EventNotificationUI.Instance.NotifyAnimalEat($"Animal({animalID})", grassName);
+        }
+        
+        // Fixed +50 hunger gain per grass eaten (ensures animal is satisfied)
+        float hungerGain = 50f;
+        
+        // Rule 3: Fill hunger tank first
+        if (hunger < maxHunger)
+        {
+            float hungerSpace = maxHunger - hunger;
+            float hungerFill = Mathf.Min(hungerGain, hungerSpace);
+            hunger += hungerFill;
+            hungerGain -= hungerFill;
+            
+            Debug.Log($"[Animal] {gameObject.name} ate grass: +{hungerFill:F1} hunger (now {hunger:F1}/{maxHunger})");
+        }
+        
+        // Rule 4: Excess energy goes to biomass if hunger is full
+        if (hungerGain > 0f && hunger >= maxHunger)
+        {
+            biomass += hungerGain * 0.1f;  // Convert excess to biomass (10% conversion)
             biomass = Mathf.Clamp(biomass, 0f, maxBiomass);
             
-            if (Time.frameCount % 60 == 0)
+            Debug.Log($"[Animal] {gameObject.name} converted excess to biomass: +{hungerGain * 0.1f:F1} kg (now {biomass:F1} kg)");
+        }
+        
+        // Destroy grass immediately after eating
+        Debug.Log($"[Animal] {gameObject.name} DESTROYING grass {targetPlant.gameObject.name}");
+        
+        // Notify UI about grass depletion with grass name
+        if (EventNotificationUI.Instance != null)
+        {
+            string grassName = targetPlant.gameObject.name;
+            EventNotificationUI.Instance.NotifyGrassDepleted(grassName);
+        }
+        
+        // Notify respawn manager to grow new grass
+        if (GrassRespawnManager.Instance != null)
+        {
+            GrassRespawnManager.Instance.OnGrassEaten();
+        }
+        
+        GameObject grassToDestroy = targetPlant.gameObject;
+        targetPlant = null;
+        Destroy(grassToDestroy);
+    }
+    
+    void Wander()
+    {
+        wanderTimer += Time.deltaTime;
+        
+        // Pick new random direction periodically
+        if (wanderTimer >= wanderInterval)
+        {
+            wanderTimer = 0f;
+            SetNewWanderTarget();
+        }
+        
+        // Move towards wander target
+        float distance = Vector2.Distance(transform.position, wanderTarget);
+        
+        if (distance > 0.5f)
+        {
+            currentActivity = ActivityState.Walking;
+            Vector2 direction = (wanderTarget - (Vector2)transform.position).normalized;
+            Vector3 newPosition = transform.position + (Vector3)(direction * moveSpeed * 0.5f * Time.deltaTime);  // Half speed when wandering
+            
+            // Clamp to land boundaries (prevent walking into ocean)
+            transform.position = WorldBounds.ClampToLand(newPosition);
+        }
+        else
+        {
+            currentActivity = ActivityState.Resting;
+        }
+    }
+    
+    void SetNewWanderTarget()
+    {
+        // Pick random point within wanderRadius that stays on land
+        for (int i = 0; i < 10; i++)  // Try 10 times to find valid land position
+        {
+            Vector2 randomDirection = Random.insideUnitCircle.normalized;
+            float randomDistance = Random.Range(1f, wanderRadius);
+            Vector2 candidateTarget = (Vector2)transform.position + randomDirection * randomDistance;
+            
+            // Check if target is on land (not in ocean)
+            if (WorldBounds.IsOnLand(candidateTarget))
             {
-                //Debug.Log($"[AnimalMetabolism] {gameObject.name} ate {biomassTaken:F1} kg from {nearestPlant.gameObject.name}, gained {biomassGained:F1} kg");
+                wanderTarget = candidateTarget;
+                return;
             }
         }
+        
+        // Fallback: stay near current position if all attempts failed
+        wanderTarget = (Vector2)transform.position + Random.insideUnitCircle * 0.5f;
     }
     
     public void Die()
@@ -230,7 +467,13 @@ public class AnimalMetabolism : MonoBehaviour
             atmosphere.UnregisterAnimalAgent(this);
         }
         
-        //Debug.Log($"[AnimalMetabolism] {gameObject.name} died (starvation)! Biomass: {biomass:F1} kg");
+        Debug.Log($"[AnimalMetabolism] {gameObject.name} died (starvation)! Biomass: {biomass:F1} kg");
+        
+        // Notify UI about death
+        if (EventNotificationUI.Instance != null)
+        {
+            EventNotificationUI.Instance.NotifyAnimalDeath($"Animal({animalID})");
+        }
         
         SpriteRenderer sprite = GetComponent<SpriteRenderer>();
         if (sprite != null)
@@ -253,7 +496,19 @@ public class AnimalMetabolism : MonoBehaviour
     
     void OnDrawGizmosSelected()
     {
-        Gizmos.color = biomass < hungerThreshold ? Color.red : Color.green;
-        Gizmos.DrawWireSphere(transform.position, searchRadius);
+        // Red if hunger is low, green if hunger is good
+        Gizmos.color = hunger < maxHunger * 0.3f ? Color.red : Color.green;
+        Gizmos.DrawWireSphere(transform.position, visionRadius);
+        
+        // Show eating range
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, eatingRange);
+        
+        // Draw line to target plant
+        if (targetPlant != null)
+        {
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawLine(transform.position, targetPlant.transform.position);
+        }
     }
 }

@@ -60,7 +60,7 @@ public class PlantAgent : MonoBehaviour
 
     [Header("Death Settings")]
     [Tooltip("Minimum biomass before death")]
-    public float minBiomass = 0.1f;
+    public float minBiomass = 1.0f;  // Die when biomass drops to 1kg or below
 
     [Tooltip("Enable death when biomass depleted")]
     public bool enableDeath = true;

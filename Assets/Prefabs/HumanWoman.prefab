@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &6713439815758559079
+--- !u!1 &5353350407577176133
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,44 +8,44 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 5269478478956251535}
-  - component: {fileID: 8291116069626481834}
-  - component: {fileID: 4269564084126604181}
-  - component: {fileID: 21471420305310142}
-  - component: {fileID: 1919407203810624072}
-  - component: {fileID: 1322076820243676467}
-  - component: {fileID: -8689249140359428571}
-  - component: {fileID: -8871967679949524613}
-  - component: {fileID: 3580869197733667111}
-  m_Layer: 3
-  m_Name: Animal
+  - component: {fileID: 7550751419729909772}
+  - component: {fileID: 4417551377088477918}
+  - component: {fileID: 2965236534321140650}
+  - component: {fileID: 4177502772750787592}
+  - component: {fileID: 8101103242380977014}
+  - component: {fileID: 9097965277547660108}
+  - component: {fileID: -1163324528198765165}
+  - component: {fileID: -3446604018463691863}
+  - component: {fileID: 8443344062141226469}
+  m_Layer: 0
+  m_Name: HumanWoman
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &5269478478956251535
+--- !u!4 &7550751419729909772
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6713439815758559079}
+  m_GameObject: {fileID: 5353350407577176133}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 1.1299999, y: 1.7799999, z: 0}
-  m_LocalScale: {x: 0.25, y: 0.25, z: 1}
+  m_LocalPosition: {x: -1.5209999, y: -0.066999994, z: 0}
+  m_LocalScale: {x: 0.5, y: 0.5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!212 &8291116069626481834
+--- !u!212 &4417551377088477918
 SpriteRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6713439815758559079}
+  m_GameObject: {fileID: 5353350407577176133}
   m_Enabled: 1
   m_CastShadows: 0
   m_ReceiveShadows: 0
@@ -83,8 +83,8 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 1
-  m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
-  m_Color: {r: 0.70230603, g: 0.11557865, b: 0.11557865, a: 1}
+  m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b, type: 3}
+  m_Color: {r: 1, g: 0.5712788, b: 0.90568614, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -94,13 +94,61 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
---- !u!58 &4269564084126604181
-CircleCollider2D:
+--- !u!114 &2965236534321140650
+MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6713439815758559079}
+  m_GameObject: {fileID: 5353350407577176133}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1353d84800eed3949ae791316123c48b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  canMove: 0
+  speed: 2
+  retargetInterval: 3
+  arriveDistance: 0.2
+  areaCenter: {x: 0, y: 0, z: 0}
+  areaHalfExtents: {x: 0, y: 0}
+  showBreathing: 1
+  breathingSpeed: 1.2
+  breathingAmount: 0.06
+--- !u!50 &4177502772750787592
+Rigidbody2D:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5353350407577176133}
+  m_BodyType: 0
+  m_Simulated: 1
+  m_UseFullKinematicContacts: 0
+  m_UseAutoMass: 0
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_GravityScale: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_Interpolate: 0
+  m_SleepingMode: 1
+  m_CollisionDetection: 0
+  m_Constraints: 0
+--- !u!61 &8101103242380977014
+BoxCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5353350407577176133}
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
@@ -129,70 +177,24 @@ CircleCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_Radius: 0.35
---- !u!114 &21471420305310142
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6713439815758559079}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 97694150632c2f44da073c96925c34ee, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  canMove: 0
-  speed: 2
-  retargetInterval: 2
-  arriveDistance: 0.1
-  avoidRadius: 0.4
-  obstacleMask:
-    serializedVersion: 2
-    m_Bits: 0
-  facingMode: 0
-  turnSpeed: 360
-  spriteAngleOffset: 0
-  facingIdleThreshold: 0.01
-  areaCenter: {x: 0, y: 0, z: 0}
-  areaHalfExtents: {x: 0, y: 0}
-  showBreathing: 1
-  breathingSpeed: 1.5
-  breathingAmount: 0.05
---- !u!50 &1919407203810624072
-Rigidbody2D:
-  serializedVersion: 5
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6713439815758559079}
-  m_BodyType: 0
-  m_Simulated: 1
-  m_UseFullKinematicContacts: 0
-  m_UseAutoMass: 0
-  m_Mass: 1
-  m_LinearDamping: 0
-  m_AngularDamping: 0.05
-  m_GravityScale: 1
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_Interpolate: 0
-  m_SleepingMode: 1
-  m_CollisionDetection: 0
-  m_Constraints: 0
---- !u!58 &1322076820243676467
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0.5, y: 0.5}
+    oldSize: {x: 1, y: 1}
+    newSize: {x: 1, y: 1}
+    adaptiveTilingThreshold: 0.5
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  m_Size: {x: 1, y: 1}
+  m_EdgeRadius: 0
+--- !u!58 &9097965277547660108
 CircleCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6713439815758559079}
+  m_GameObject: {fileID: 5353350407577176133}
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
@@ -216,43 +218,43 @@ CircleCollider2D:
   m_CallbackLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_Radius: 0.3
---- !u!114 &-8689249140359428571
+  m_Radius: 0.4
+--- !u!114 &-1163324528198765165
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6713439815758559079}
+  m_GameObject: {fileID: 5353350407577176133}
   m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b9cf4afdf039ce647b1882550125e805, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  entityType: 1
-  currentEnergy: 80
+  entityType: 2
+  currentEnergy: 70
   maxEnergy: 100
-  respirationLossRate: 0.2
+  respirationLossRate: 0.3
   photosynthesisGainRate: 0.5
   eatingAmount: 10
-  searchRadius: 4
-  searchInterval: 2
-  trophicEfficiency: 0.18
+  searchRadius: 6
+  searchInterval: 3
+  trophicEfficiency: 0.12
   isAlive: 1
   isHungry: 0
-  hungerThreshold: 50
---- !u!114 &-8871967679949524613
+  hungerThreshold: 60
+--- !u!114 &-3446604018463691863
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6713439815758559079}
+  m_GameObject: {fileID: 5353350407577176133}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7db70e0ea77f5ac47a8f4565a9406397, type: 3}
@@ -274,20 +276,20 @@ MonoBehaviour:
   - {x: 0.5, y: -0.5, z: 0}
   m_ShapePathHash: 0
   m_InstanceId: 0
-  m_ShadowShape2DComponent: {fileID: 8291116069626481834}
+  m_ShadowShape2DComponent: {fileID: 4417551377088477918}
   m_ShadowShape2DProvider:
-    rid: 2340870476025036867
+    rid: 2340870476025036869
   m_ShadowCastingSource: 2
   m_ShadowMesh:
     m_Mesh: {fileID: 0}
     m_LocalBounds:
       m_Center: {x: 0, y: 0, z: 0}
-      m_Extent: {x: 0.4900055, y: 0.4900055, z: 0}
+      m_Extent: {x: 0.47999573, y: 0.47999573, z: 0}
     m_EdgeProcessing: 1
-    m_TrimEdge: 0.01
+    m_TrimEdge: 0.02
     m_FlipX: 0
     m_FlipY: 0
-    m_InitialTrim: 0.01
+    m_InitialTrim: 0.02
   m_CastingOption: 1
   m_PreviousTrimEdge: 0
   m_PreviousEdgeProcessing: -1
@@ -296,39 +298,39 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
-    - rid: 2340870476025036867
+    - rid: 2340870476025036869
       type: {class: ShadowShape2DProvider_SpriteRenderer, ns: UnityEngine.Rendering.Universal, asm: Unity.RenderPipelines.Universal.2D.Runtime}
       data: 
---- !u!114 &3580869197733667111
+--- !u!114 &8443344062141226469
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6713439815758559079}
+  m_GameObject: {fileID: 5353350407577176133}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 11cca85df2735fb4691d579749a02999, type: 3}
+  m_Script: {fileID: 11500000, guid: 190e508c72806dd49abb548751f6befe, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  biomass: 30
-  maxBiomass: 60
+  biomass: 70
+  maxBiomass: 100
   hunger: 50
   maxHunger: 100
-  hungerDepletionRate: 0.2
-  basalMetabolicRate: 0.00002
-  Q10_factor: 2
-  comfortTemperature: 22
+  hungerDepletionRate: 0.15
+  hungerSearchThreshold: 40
+  hungerGainPerAnimal: 90
+  basalMetabolicRate: 0.000025
+  Q10_factor: 1.5
+  comfortTemperature: 24
   currentActivity: 0
   metabolismScale: 0.1
-  eatingAmount: 5
-  searchInterval: 3
-  trophicEfficiency: 0.1
-  moveSpeed: 1.5
-  eatingRange: 0.3
-  visionRadius: 10
-  enableWandering: 1
-  wanderRadius: 5
+  searchRadius: 5
+  searchInterval: 5
+  trophicEfficiency: 0.15
   isAlive: 1
-  animalID: 0
+  moveSpeed: 1.5
+  wanderRadius: 3
+  eatingRange: 0.6
+  wanderInterval: 3
   totalRespiration: 0

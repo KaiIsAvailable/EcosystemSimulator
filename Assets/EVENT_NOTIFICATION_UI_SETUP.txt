@@ -1,0 +1,120 @@
+EVENT NOTIFICATION UI SETUP GUIDE
+=================================
+
+This UI shows real-time events like:
+🐰 Animal eat grass
+⚠️ Animal is starving
+💀 Animal died
+🌱 Grass consumed
+
+SETUP INSTRUCTIONS:
+-------------------
+
+1. CREATE UI PANEL:
+   - Right-click in Hierarchy → UI → Panel
+   - Name it "EventNotificationPanel"
+
+2. CONFIGURE PANEL:
+   - Rect Transform:
+     * Anchor: Bottom-Left
+     * Anchor Presets: Click bottom-left corner (hold Shift+Alt for position)
+     * Pos X: 10, Pos Y: 10
+     * Width: 300, Height: 150
+   
+   - Image Component:
+     * Color: (0, 0, 0, 150) - Semi-transparent black
+
+3. ADD TEXT COMPONENT:
+   - Right-click EventNotificationPanel → UI → Text
+   - Name it "NotificationText"
+   
+   - Text Component Settings:
+     * Text: (leave empty)
+     * Font: Arial or your preferred font
+     * Font Size: 14
+     * Color: White (255, 255, 255, 255)
+     * Alignment: Left + Top
+     * Rich Text: ✓ ENABLED (important for colors!)
+     * Best Fit: Optional
+   
+   - Rect Transform:
+     * Anchor: Stretch (fill parent)
+     * Left: 10, Right: 10, Top: 10, Bottom: 10
+
+4. ADD SCRIPT TO PANEL:
+   - Select EventNotificationPanel
+   - Add Component → EventNotificationUI
+   - Drag NotificationText into the "Notification Text" field
+   
+   - Settings:
+     * Max Notifications: 5
+     * Notification Duration: 3.0
+     * Show Notifications: ✓ (checked)
+
+5. VERIFY SETUP:
+   - EventNotificationUI should auto-register as Instance
+   - Run the game - notifications appear when:
+     * Animal eats grass (green)
+     * Animal is starving (orange)
+     * Animal dies (red)
+     * Grass consumed (pale green)
+
+LAYOUT PREVIEW:
+---------------
+
+┌────────────────────────────────────┐
+│  🌍 ATMOSPHERE (Top-Right)         │
+│  [Existing Dashboard]              │
+│                                    │
+│                                    │
+│                                    │
+│  [Game View]                       │
+│                                    │
+│                                    │
+│ ┌──────────────────────┐           │
+│ │ EVENT NOTIFICATIONS  │ (Bottom-  │
+│ │ 🐰 Animal(Clone) ate │  Left)    │
+│ │    grass             │           │
+│ │ 🌱 Grass consumed    │           │
+│ │ ⚠️ Animal(Clone) is  │           │
+│ │    starving!         │           │
+│ └──────────────────────┘           │
+└────────────────────────────────────┘
+
+CUSTOMIZATION:
+--------------
+
+Position Options:
+- Bottom-Left (default): Good for event log
+- Top-Left: Alternative if dashboard is on right
+- Bottom-Right: Mirror layout
+
+Color Customization (in EventNotificationUI.cs):
+- Eating: new Color(0.5f, 1f, 0.5f) - Light green
+- Starving: new Color(1f, 0.8f, 0.3f) - Orange
+- Death: new Color(1f, 0.3f, 0.3f) - Red
+- Grass: new Color(0.7f, 0.9f, 0.7f) - Pale green
+
+TROUBLESHOOTING:
+----------------
+
+Q: Notifications don't appear?
+A: - Check Rich Text is enabled on Text component
+   - Verify EventNotificationUI is on a GameObject
+   - Check "Show Notifications" is enabled
+   - Look for errors in Console
+
+Q: Colors don't show?
+A: - Rich Text MUST be enabled on Text component
+   - Check Text component uses Legacy Text (not TextMeshPro)
+
+Q: Too many/few notifications?
+A: - Adjust "Max Notifications" (default: 5)
+   - Adjust "Notification Duration" (default: 3 seconds)
+
+Q: Notifications fade too fast?
+A: - Increase "Notification Duration" to 5-10 seconds
+
+DONE!
+-----
+Your event notification system is ready. Animals will now report their activities in real-time!

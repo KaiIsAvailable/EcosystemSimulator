@@ -17,10 +17,14 @@ public class EcosystemDashboardUI : MonoBehaviour
     public SunMoonController sunMoon;
     public Button toggleButton;
     public GameObject panelToToggle;  // The BarChartPanel GameObject to hide/show
+    public Button toggleButtonActivities;
+    public GameObject panelToToggleActivities;
+    public Button toggleButtonControls;
+    public GameObject panelToToggleControls;
     
     [Header("Auto Layout")]
     public RectTransform container;
-    public float updateInterval = 0.5f;
+    public float updateInterval = 0.1f;  // Faster updates for smoother display
     
     [Header("Dashboard Sections")]
     private Text headerText;
@@ -31,7 +35,24 @@ public class EcosystemDashboardUI : MonoBehaviour
     
     private float updateTimer = 0f;
     private bool isInitialized = false;
-    private bool isVisible = false;  // Start hidden
+    private bool isDashboardVisible = false;  // Track dashboard panel separately
+    private bool isActivitiesVisible = true;  // Track activities panel separately
+    private bool isControlsVisible = true;  // Track controls panel separately
+    
+    // Smoothing variables for smooth transitions
+    private float smoothedPhotoO2 = 0f;
+    private float smoothedRespO2 = 0f;
+    private float smoothedAnimalO2 = 0f;
+    private float smoothedHumanO2 = 0f;
+    private float smoothedOceanCO2 = 0f;
+    private float smoothedN2 = 0f;
+    private float smoothedO2 = 0f;
+    private float smoothedAr = 0f;
+    private float smoothedCO2 = 0f;
+    private float smoothedTemp = 0f;
+    private float smoothedHours = 0f;
+    private float smoothedMinutes = 0f;
+    private float smoothingSpeed = 5f;  // Higher = faster response
     
     void Start()
     {
@@ -68,14 +89,31 @@ public class EcosystemDashboardUI : MonoBehaviour
             toggleButton.onClick.AddListener(ToggleDashboard);
         }
         
-        // Hide dashboard on start
+        // Initialize visibility state based on actual panel state
         if (panelToToggle != null)
         {
+            isDashboardVisible = panelToToggle.activeSelf;
+            // Ensure panel starts hidden
             panelToToggle.SetActive(false);
+            isDashboardVisible = false;
+        }
+        
+        if (panelToToggleActivities != null)
+        {
+            // Ensure activities panel starts VISIBLE
+            panelToToggleActivities.SetActive(true);
+            isActivitiesVisible = true;
+        }
+
+        if (panelToToggleControls != null)
+        {
+            // Ensure controls panel starts VISIBLE
+            panelToToggleControls.SetActive(true);
+            isControlsVisible = true;
         }
         
         isInitialized = true;
-        Debug.Log("[Dashboard] Initialization complete! Press E to show dashboard.");
+        Debug.Log("[Dashboard] Initialization complete! Press E to show dashboard, R to show activities.");
     }
     
     void Update()
@@ -87,11 +125,20 @@ public class EcosystemDashboardUI : MonoBehaviour
         {
             ToggleDashboard();
         }
-        
-        updateTimer += Time.deltaTime;
-        if (updateTimer >= updateInterval)
+
+        if (Input.GetKeyDown(KeyCode.R))
         {
-            updateTimer = 0f;
+            ToggleDashboardActivities();
+        }
+
+        if (Input.GetKeyDown(KeyCode.T))
+        {
+            ToggleDashboardControls();
+        }
+        
+        // Update every frame for smooth transitions (only when dashboard is visible)
+        if (isDashboardVisible)
+        {
             UpdateDashboard();
         }
     }
@@ -194,8 +241,21 @@ public class EcosystemDashboardUI : MonoBehaviour
         float humanCO2Day = humanCO2 * atmosphere.secondsPerDay;
         float oceanCO2Day = oceanCO2 * atmosphere.secondsPerDay;
         
-        float netO2 = photoO2Day + respO2Day + animalO2Day + humanO2Day;
-        float netCO2 = -photoO2Day - respO2Day + animalCO2Day + humanCO2Day + oceanCO2Day;
+        // Smooth all values to prevent jumping
+        float deltaTime = Time.deltaTime;
+        smoothedPhotoO2 = Mathf.Lerp(smoothedPhotoO2, photoO2Day, deltaTime * smoothingSpeed);
+        smoothedRespO2 = Mathf.Lerp(smoothedRespO2, respO2Day, deltaTime * smoothingSpeed);
+        smoothedAnimalO2 = Mathf.Lerp(smoothedAnimalO2, animalO2Day, deltaTime * smoothingSpeed);
+        smoothedHumanO2 = Mathf.Lerp(smoothedHumanO2, humanO2Day, deltaTime * smoothingSpeed);
+        smoothedOceanCO2 = Mathf.Lerp(smoothedOceanCO2, oceanCO2Day, deltaTime * smoothingSpeed);
+        smoothedN2 = Mathf.Lerp(smoothedN2, atmosphere.nitrogen, deltaTime * smoothingSpeed);
+        smoothedO2 = Mathf.Lerp(smoothedO2, atmosphere.oxygen, deltaTime * smoothingSpeed);
+        smoothedAr = Mathf.Lerp(smoothedAr, atmosphere.argon, deltaTime * smoothingSpeed);
+        smoothedCO2 = Mathf.Lerp(smoothedCO2, atmosphere.carbonDioxide, deltaTime * smoothingSpeed);
+        smoothedTemp = Mathf.Lerp(smoothedTemp, sunMoon.currentTemperature, deltaTime * smoothingSpeed);
+        
+        float netO2 = smoothedPhotoO2 + smoothedRespO2 + smoothedAnimalO2 + smoothedHumanO2;
+        float netCO2 = -smoothedPhotoO2 - smoothedRespO2 + animalCO2Day + humanCO2Day + smoothedOceanCO2;
         
         // ═══════════════════════════════════════════════════════════
         // HEADER SECTION
@@ -204,6 +264,7 @@ public class EcosystemDashboardUI : MonoBehaviour
         string statusIcon = atmosphere.environmentalStatus == AtmosphereManager.EnvironmentalStatus.Healthy ? "🟢" : "⚠️";
         string statusText = atmosphere.environmentalStatus.ToString().ToUpper();
         
+        // Use actual time values for accuracy (no smoothing)
         headerText.text = $"DAY {sunMoon.day} | {sunMoon.hours:00}:{sunMoon.minutes:00} {timeIcon} | {statusIcon} {statusText}";
         
         // ═══════════════════════════════════════════════════════════
@@ -222,84 +283,76 @@ public class EcosystemDashboardUI : MonoBehaviour
         string co2Arrow = netCO2 > 0 ? "↑" : "↓";
         
         // Create mini bar chart for gas flow breakdown
-        float maxRate = 30f; // Max mol/day for scale
-        string photoBar = CreateMiniBar(photoO2Day, maxRate, 10);
-        string respBar = CreateMiniBar(Mathf.Abs(respO2Day), maxRate, 10);
-        string animalBar = CreateMiniBar(Mathf.Abs(animalO2Day), maxRate, 10);
-        string humanBar = CreateMiniBar(Mathf.Abs(humanO2Day), maxRate, 10);
-        string oceanBar = CreateMiniBar(Mathf.Abs(oceanCO2Day), maxRate, 10);
+        // Use dynamic max based on actual values for realistic scaling
+        float maxFlowRate = Mathf.Max(5f, 
+            Mathf.Abs(smoothedPhotoO2), 
+            Mathf.Abs(smoothedRespO2), 
+            Mathf.Abs(smoothedAnimalO2), 
+            Mathf.Abs(smoothedHumanO2), 
+            Mathf.Abs(smoothedOceanCO2)) * 1.1f; // 10% margin
+        
+        string photoBar = CreateMiniBar(smoothedPhotoO2, maxFlowRate, 25);
+        string respBar = CreateMiniBar(Mathf.Abs(smoothedRespO2), maxFlowRate, 25);
+        string animalBar = CreateMiniBar(Mathf.Abs(smoothedAnimalO2), maxFlowRate, 25);
+        string humanBar = CreateMiniBar(Mathf.Abs(smoothedHumanO2), maxFlowRate, 25);
+        string oceanBar = CreateMiniBar(Mathf.Abs(smoothedOceanCO2), maxFlowRate, 25);
         
         gasFlowText.text = $"<b>GAS FLOW</b>\n\n" +
                            $"{o2Arrow} {netO2:+0.00;-0.00} O₂\n" +
                            $"{co2Arrow} {netCO2:+0.00;-0.00} CO₂\n\n" +
                            $"<size=10><b>Flow Breakdown:</b>\n" +
-                           $"Photo {photoBar} {photoO2Day:+0.0}\n" +
-                           $"Resp  {respBar} {respO2Day:+0.0}\n" +
-                           $"Animal {animalBar} {animalO2Day:+0.0}\n" +
-                           $"Human  {humanBar} {humanO2Day:+0.0}\n" +
-                           $"Ocean  {oceanBar} {oceanCO2Day:+0.0}</size>";
+                           $"Photo {photoBar} {smoothedPhotoO2:+0.0}\n" +
+                           $"Resp  {respBar} {smoothedRespO2:+0.0}\n" +
+                           $"Animal {animalBar} {smoothedAnimalO2:+0.0}\n" +
+                           $"Human  {humanBar} {smoothedHumanO2:+0.0}\n" +
+                           $"Ocean  {oceanBar} {smoothedOceanCO2:+0.0}</size>";
         
         // ═══════════════════════════════════════════════════════════
         // ATMOSPHERE SECTION (Bottom Left)
         // ═══════════════════════════════════════════════════════════
-        // Create simple text-based pie chart visualization
-        string pieChart = CreateTextPieChart(
-            atmosphere.nitrogen,
-            atmosphere.oxygen,
-            atmosphere.argon,
-            atmosphere.carbonDioxide,
-            atmosphere.waterVapor
-        );
+        // Calculate moles for each gas
+        float totalMoles = atmosphere.totalAtmosphereMoles;
+        float n2Moles = totalMoles * (smoothedN2 / 100f);
+        float o2Moles = totalMoles * (smoothedO2 / 100f);
+        float arMoles = totalMoles * (smoothedAr / 100f);
+        float co2Moles = totalMoles * (smoothedCO2 / 100f);
+        
+        // Create animated bars for each gas (based on percentage, not absolute moles)
+        // This makes bars proportional to composition
+        string n2Bar = CreateMiniBar(smoothedN2, 100f, 30);
+        string o2Bar = CreateMiniBar(smoothedO2, 100f, 30);
+        string arBar = CreateMiniBar(smoothedAr, 100f, 30);
+        string co2Bar = CreateMiniBar(smoothedCO2, 100f, 30);
         
         atmosphereText.text = $"<b>ATMOSPHERE</b>\n\n" +
-                              $"{pieChart}\n\n" +
-                              $"<size=10>⚪ N₂: {atmosphere.nitrogen:F1}%\n" +
-                              $"🔵 O₂: {atmosphere.oxygen:F1}%\n" +
-                              $"🟣 Ar: {atmosphere.argon:F2}%\n" +
-                              $"⚫ CO₂: {atmosphere.carbonDioxide:F3}%\n" +
-                              $"💧 H₂O: {atmosphere.waterVapor:F2}%</size>\n\n" +
-                              $"Total: {atmosphere.totalAtmosphereMoles:F0} mol";
+                              $"N₂ {n2Bar} {n2Moles:F2} ({smoothedN2:F3}%)\n" +
+                              $"Ar {arBar} {arMoles:F2} ({smoothedAr:F3}%)\n" +
+                              $"O₂ {o2Bar} {o2Moles:F2} ({smoothedO2:F3}%)\n" +
+                              $"CO₂ {co2Bar} {co2Moles:F2} ({smoothedCO2:F3}%)\n\n" +
+                              $"Total: {totalMoles:F2} mol";
         
         // ═══════════════════════════════════════════════════════════
         // ENVIRONMENT SECTION (Bottom Right)
         // ═══════════════════════════════════════════════════════════
-        float temperature = sunMoon.currentTemperature;
-        float oceanSink = Mathf.Abs(oceanCO2Day);
+        float oceanSink = Mathf.Abs(smoothedOceanCO2);
         float respirationBaseline = sunMoon.GetRespirationMultiplier();
         
         environmentText.text = $"<b>ENVIRONMENT</b>\n\n" +
-                               $"🌡️ {temperature:F1}°C\n\n" +
-                               $"🌊 {oceanSink:F2} ocean sink\n\n" +
-                               $"📊 {respirationBaseline:F2}× baseline";
-    }
-    
-    string CreateTextPieChart(float n2, float o2, float ar, float co2, float h2o)
-    {
-        // Simple 3-line pie chart using blocks
-        // N₂ is largest (78%), O₂ is second (21%), others are tiny
-        
-        int totalChars = 20;
-        int n2Chars = Mathf.RoundToInt((n2 / 100f) * totalChars);
-        int o2Chars = Mathf.RoundToInt((o2 / 100f) * totalChars);
-        int arChars = Mathf.Max(1, Mathf.RoundToInt((ar / 100f) * totalChars));
-        int co2Chars = Mathf.Max(1, Mathf.RoundToInt((co2 / 100f) * totalChars));
-        int h2oChars = totalChars - n2Chars - o2Chars - arChars - co2Chars;
-        h2oChars = Mathf.Max(0, h2oChars);
-        
-        // Build visual bar
-        string bar = "";
-        bar += new string('█', n2Chars);  // N₂ (white/gray)
-        bar += new string('█', o2Chars);  // O₂ (blue)
-        bar += new string('▓', arChars);  // Ar (purple)
-        bar += new string('▒', co2Chars); // CO₂ (black)
-        bar += new string('░', h2oChars); // H₂O (light)
-        
-        return $"[{bar}]";
+                               $"{smoothedTemp:F1}°C\n\n" +
+                               $"{oceanSink:F2} ocean sink\n\n" +
+                               $"{respirationBaseline:F2}× baseline";
     }
     
     string CreateMiniBar(float value, float maxValue, int barLength)
     {
-        int filled = Mathf.Clamp(Mathf.RoundToInt((Mathf.Abs(value) / maxValue) * barLength), 0, barLength);
+        float percentage = Mathf.Abs(value) / maxValue;
+        int filled = Mathf.RoundToInt(percentage * barLength);
+        
+        // Ensure at least 1 block shows if value > 0
+        if (value > 0 && filled == 0)
+            filled = 1;
+        
+        filled = Mathf.Clamp(filled, 0, barLength);
         int empty = barLength - filled;
         return "[" + new string('█', filled) + new string('·', empty) + "]";
     }
@@ -348,22 +401,67 @@ public class EcosystemDashboardUI : MonoBehaviour
     
     public void ToggleDashboard()
     {
-        isVisible = !isVisible;
+        isDashboardVisible = !isDashboardVisible;
         
         // Toggle the panel GameObject
         if (panelToToggle != null)
         {
-            panelToToggle.SetActive(isVisible);
+            panelToToggle.SetActive(isDashboardVisible);
         }
         
         // Change button color
         if (toggleButton != null)
         {
             ColorBlock colors = toggleButton.colors;
-            colors.normalColor = isVisible ? Color.white : new Color(0.5f, 0.8f, 1f);
+            colors.normalColor = isDashboardVisible ? Color.white : new Color(0.5f, 0.8f, 1f);
             toggleButton.colors = colors;
         }
         
-        Debug.Log($"[Dashboard] {(isVisible ? "Shown" : "Hidden")}");
+        Debug.Log($"[Dashboard] {(isDashboardVisible ? "Shown" : "Hidden")}");
     }
+
+    public void ToggleDashboardActivities()
+    {
+        isActivitiesVisible = !isActivitiesVisible;
+
+        // Toggle panel only
+        if (panelToToggleActivities != null)
+        {
+            panelToToggleActivities.SetActive(isActivitiesVisible);
+        }
+
+        // Move Button
+        if (toggleButtonActivities != null)
+        {
+            // Change button color
+            ColorBlock colors = toggleButtonActivities.colors;
+            colors.normalColor = isActivitiesVisible ? Color.white : new Color(0.5f, 0.8f, 1f);
+            toggleButtonActivities.colors = colors;
+        }
+
+        Debug.Log($"[Activities Log] {(isActivitiesVisible ? "Shown" : "Hidden")}");
+    }
+
+    public void ToggleDashboardControls()
+    {
+        isControlsVisible = !isControlsVisible;
+
+        // Toggle panel only
+        if (panelToToggleControls != null)
+        {
+            panelToToggleControls.SetActive(isControlsVisible);
+        }
+
+        // Move Button
+        if (toggleButtonControls != null)
+        {
+            // Change button color
+            ColorBlock colors = toggleButtonControls.colors;
+            colors.normalColor = isControlsVisible ? Color.white : new Color(0.5f, 0.8f, 1f);
+            toggleButtonControls.colors = colors;
+        }
+
+        Debug.Log($"[Controls Log] {(isControlsVisible ? "Shown" : "Hidden")}");
+    }
+
 }

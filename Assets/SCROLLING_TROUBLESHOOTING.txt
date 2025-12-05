@@ -1,0 +1,174 @@
+SCROLLING NOT WORKING - TROUBLESHOOTING GUIDE
+==============================================
+
+If scrolling isn't working, follow these steps:
+
+STEP 1: CHECK HIERARCHY STRUCTURE
+----------------------------------
+Your hierarchy MUST look like this:
+
+EventNotificationScrollView (GameObject with ScrollRect)
+├── Viewport (GameObject with Image + Mask)
+│   └── Content (GameObject with RectTransform)
+│       └── NotificationText (GameObject with Text)
+└── Scrollbar Vertical (GameObject with Scrollbar) [OPTIONAL]
+
+STEP 2: CONFIGURE SCROLL VIEW (Parent GameObject)
+--------------------------------------------------
+Select "EventNotificationScrollView" and check:
+
+✓ ScrollRect Component:
+  - Content: Drag "Content" GameObject here
+  - Viewport: Drag "Viewport" GameObject here
+  - Horizontal: ✗ UNCHECKED
+  - Vertical: ✓ CHECKED
+  - Movement Type: Elastic
+  - Inertia: ✓ CHECKED
+  - Scroll Sensitivity: 10
+  - Vertical Scrollbar: Drag "Scrollbar Vertical" (if exists)
+  - Visibility: Auto Hide
+
+✓ RectTransform:
+  - Anchor: Bottom-Left
+  - Width: 350
+  - Height: 200
+  - Pos X: 175, Pos Y: 100
+
+STEP 3: CONFIGURE VIEWPORT
+---------------------------
+Select "Viewport" (child of ScrollView):
+
+✓ Image Component:
+  - Color: White or transparent
+  - Raycast Target: ✓ CHECKED
+
+✓ Mask Component:
+  - Show Mask Graphic: ✗ UNCHECKED
+
+✓ RectTransform:
+  - Anchor: Stretch (all sides)
+  - Left: 0, Right: 0, Top: 0, Bottom: 0
+
+STEP 4: CONFIGURE CONTENT (CRITICAL!)
+--------------------------------------
+Select "Content" (child of Viewport):
+
+✓ RectTransform:
+  - Anchor Preset: Top Stretch
+  - Pivot: X=0.5, Y=1 (top center)
+  - Pos X: 0, Pos Y: 0
+  - Left: 0, Right: 0, Top: 0
+  - Height: 50 (will expand automatically)
+
+✓ Add Component: Vertical Layout Group
+  - Padding: Left=10, Right=10, Top=10, Bottom=10
+  - Spacing: 2
+  - Child Alignment: Upper Left
+  - Child Control Size - Width: ✓ CHECKED
+  - Child Control Size - Height: ✗ UNCHECKED
+  - Child Force Expand - Width: ✓ CHECKED
+  - Child Force Expand - Height: ✗ UNCHECKED
+
+✓ Add Component: Content Size Fitter
+  - Horizontal Fit: Unconstrained
+  - Vertical Fit: Preferred Size (THIS IS CRUCIAL!)
+
+STEP 5: CONFIGURE NOTIFICATION TEXT
+------------------------------------
+Select "NotificationText" (child of Content):
+
+✓ Text Component:
+  - Text: (empty)
+  - Font Size: 13
+  - Line Spacing: 1
+  - Rich Text: ✓ CHECKED
+  - Alignment: Left + Top
+  - Horizontal Overflow: Wrap
+  - Vertical Overflow: Overflow (NOT Truncate!)
+  - Best Fit: ✗ UNCHECKED
+
+✓ Layout Element Component (ADD THIS!):
+  - Add Component → Layout Element
+  - Preferred Height: -1 (auto)
+  - Flexible Height: 1
+
+✓ RectTransform:
+  - Anchor: Top Stretch
+  - Pivot: X=0.5, Y=1
+  - Left: 0, Right: 0, Top: 0
+  - Height: 50 (will expand)
+
+STEP 6: CONFIGURE SCROLLBAR (OPTIONAL)
+---------------------------------------
+If scrollbar exists:
+
+✓ Scrollbar Component:
+  - Direction: Bottom To Top
+  - Value: 0
+  - Size: 0.2
+  - Number Of Steps: 0
+
+✓ RectTransform:
+  - Anchor: Right side
+  - Width: 20
+
+STEP 7: ASSIGN REFERENCES IN SCRIPT
+------------------------------------
+Select the GameObject with EventNotificationUI script:
+
+✓ Notification Text: Drag "NotificationText" GameObject
+✓ Scroll Rect: Drag "EventNotificationScrollView" GameObject
+✓ Max History Size: 100
+✓ Show Notifications: ✓ CHECKED
+✓ Auto Scroll To Bottom: ✓ CHECKED
+
+STEP 8: TEST IN PLAY MODE
+--------------------------
+1. Press Play
+2. Check Console for debug messages:
+   - Should see: "[EventNotificationUI] ScrollRect found: ..."
+   - Should see: "[EventNotificationUI] Vertical scrollbar: ..."
+   
+3. If you see "ScrollRect is NOT assigned!":
+   - Go back and assign it manually in Inspector
+
+4. Wait for notifications to appear
+5. Try scrolling:
+   - Mouse wheel should scroll
+   - Click and drag on the text area
+   - Scrollbar should be visible when content overflows
+
+COMMON ISSUES & FIXES:
+----------------------
+
+❌ ISSUE: Scrollbar not showing
+✓ FIX: Content Size Fitter MUST have "Vertical Fit: Preferred Size"
+✓ FIX: Text Vertical Overflow MUST be "Overflow" not "Truncate"
+✓ FIX: Add more notifications (need 10+ to overflow)
+
+❌ ISSUE: Can't scroll with mouse wheel
+✓ FIX: Check ScrollRect has "Scroll Sensitivity: 10"
+✓ FIX: Check Viewport has Raycast Target enabled
+✓ FIX: Make sure mouse is over the scroll area
+
+❌ ISSUE: Text doesn't expand
+✓ FIX: Content Size Fitter "Vertical Fit" must be "Preferred Size"
+✓ FIX: Vertical Layout Group on Content must be configured
+✓ FIX: Text "Vertical Overflow" must be "Overflow"
+
+❌ ISSUE: Scrolling too sensitive/not sensitive
+✓ FIX: Adjust ScrollRect "Scroll Sensitivity" (try 5-20)
+
+❌ ISSUE: Content doesn't clip properly
+✓ FIX: Viewport needs Mask component
+✓ FIX: Viewport RectTransform should be Stretch (0,0,0,0)
+
+QUICK TEST:
+-----------
+Add 20+ notifications manually to test:
+- Run game
+- Wait for events
+- Should see scrollbar appear
+- Should be able to scroll up/down
+
+If still not working, check Console for error messages!

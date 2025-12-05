@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 /// <summary>
 /// Scientific metabolism for humans (carnivores/omnivores).
@@ -11,6 +12,18 @@ public class HumanMetabolism : MonoBehaviour
     [Tooltip("Body mass in kg (adult human)")]
     public float biomass = 70f;  // Average adult human
     public float maxBiomass = 100f;
+    
+    [Header("Hunger System")]
+    [Tooltip("Current hunger level (0-100)")]
+    public float hunger = 50f;
+    public float maxHunger = 100f;
+    [Tooltip("Hunger depletion rate per second")]
+    public float hungerDepletionRate = 0.15f;  // Slower than animals
+    [Tooltip("Hunger percentage to start searching for food")]
+    [Range(0f, 100f)]
+    public float hungerSearchThreshold = 40f;
+    [Tooltip("Hunger gain from eating one animal")]
+    public float hungerGainPerAnimal = 90f;
     
     [Header("Basal Metabolism")]
     [Tooltip("Base O₂ consumption at rest (mol/s/kg at 20°C)")]
@@ -49,7 +62,17 @@ public class HumanMetabolism : MonoBehaviour
     
     [Header("Status")]
     public bool isAlive = true;
-    public float hungerThreshold = 40f;
+    
+    [Header("Movement")]
+    [Tooltip("Let HumanAgent handle movement (disable metabolism movement)")]
+    public bool useOwnMovement = false;  // DISABLED - HumanAgent handles movement now
+    public float moveSpeed = 1.5f;
+    public float wanderRadius = 3f;
+    public float eatingRange = 0.6f;
+    private Vector2 wanderTarget;
+    private float wanderTimer = 0f;
+    public float wanderInterval = 3f;
+    private AnimalMetabolism targetAnimal = null;
     
     [Header("Debug Info")]
     public float totalRespiration = 0f;  // mol O₂/s
@@ -61,12 +84,21 @@ public class HumanMetabolism : MonoBehaviour
     private float o2Accumulator = 0f;
     private float co2Accumulator = 0f;
     private const float ACCUMULATOR_THRESHOLD = 0.01f;
+    private int animalID;
+    private static int nextAnimalID = 1;
     
     void Start()
     {
         sunMoon = FindAnyObjectByType<SunMoonController>();
         atmosphere = AtmosphereManager.Instance;
         searchTimer = Random.Range(0f, searchInterval);
+        // initialize wandering
+        wanderTarget = (Vector2)transform.position + Random.insideUnitCircle * wanderRadius;
+        wanderTimer = Random.Range(0f, wanderInterval);
+        
+        // Assign unique ID
+        animalID = nextAnimalID++;
+        gameObject.name = $"Human({animalID})";
         
         if (atmosphere != null)
         {
@@ -79,22 +111,98 @@ public class HumanMetabolism : MonoBehaviour
     {
         if (!isAlive) return;
         
+        BurnHunger();
         CalculateMetabolism();
         ProcessGasExchange();
         
-        if (biomass < hungerThreshold)
+        // MOVEMENT DISABLED - Let HumanAgent handle all movement for breeding
+        if (!useOwnMovement) return;
+        
+        // Movement & behavior (ONLY if useOwnMovement is enabled)
+        float hungerPercent = (hunger / maxHunger) * 100f;
+
+        if (hungerPercent < hungerSearchThreshold)
         {
-            searchTimer += Time.deltaTime;
-            if (searchTimer >= searchInterval)
+            // Attempt to hunt nearby animals
+            currentActivity = ActivityState.Hunting;
+
+            // If we don't have a target, search periodically
+            if (targetAnimal == null)
             {
-                searchTimer = 0f;
-                currentActivity = ActivityState.Hunting;
-                TryHuntAnimal();
-                currentActivity = ActivityState.Resting;
+                searchTimer += Time.deltaTime;
+                if (searchTimer >= searchInterval)
+                {
+                    searchTimer = 0f;
+                    TryFindNearestAnimalTarget();
+                }
+            }
+
+            // If we have a target, move towards it and eat when in range
+            if (targetAnimal != null && targetAnimal.isAlive)
+            {
+                MoveTowardsAnimal(targetAnimal);
+                float dist = Vector2.Distance(transform.position, targetAnimal.transform.position);
+                if (dist <= eatingRange)
+                {
+                    EatAnimal(targetAnimal);
+                    targetAnimal = null;
+                    currentActivity = ActivityState.Resting;
+                }
+            }
+            else
+            {
+                // No target found - wander while searching
+                Wander();
             }
         }
+        else
+        {
+            // Not hungry: wander around
+            currentActivity = ActivityState.Walking;
+            Wander();
+        }
         
+        // Die when biomass is depleted (after hunger has been exhausted and biomass is consumed)
         if (biomass <= 0f) Die();
+    }
+    
+    void BurnHunger()
+    {
+        // Gradually deplete hunger over time
+        float hungerBurn = hungerDepletionRate * Time.deltaTime;
+
+        if (hunger > 0f)
+        {
+            // Tank has fuel - burn hunger
+            hunger -= hungerBurn;
+            hunger = Mathf.Max(0f, hunger);
+
+            // Notify when starving threshold crossed (below 20%) occasionally
+            if (hunger < maxHunger * 0.2f && Time.frameCount % 300 == 0)
+            {
+                if (EventNotificationUI.Instance != null)
+                {
+                    EventNotificationUI.Instance.NotifyHumanStarving(gameObject.name);
+                }
+            }
+        }
+        else
+        {
+            // Hunger empty: consume biomass slowly (same rule as animals)
+            float biomassBurn = hungerBurn * 0.5f;  // Slower biomass burn
+            biomass -= biomassBurn;
+            biomass = Mathf.Max(0f, biomass);
+
+            if (Time.frameCount % 60 == 0)
+            {
+                Debug.Log($"[Human] {gameObject.name} STARVING! Hunger empty, burning biomass: {biomass:F1} kg left");
+                // Notify UI about starvation while burning biomass
+                if (EventNotificationUI.Instance != null)
+                {
+                    EventNotificationUI.Instance.NotifyHumanStarving(gameObject.name);
+                }
+            }
+        }
     }
     
     void CalculateMetabolism()
@@ -202,15 +310,95 @@ public class HumanMetabolism : MonoBehaviour
         
         if (nearestAnimal != null)
         {
-            float biomassTaken = nearestAnimal.biomass;
-            nearestAnimal.Die();  // Humans kill efficiently with tools
-            
-            float biomassGained = biomassTaken * trophicEfficiency;
-            biomass += biomassGained;
-            biomass = Mathf.Clamp(biomass, 0f, maxBiomass);
-            
-            //Debug.Log($"[HumanMetabolism] {gameObject.name} hunted animal, gained {biomassGained:F1} kg biomass");
+            EatAnimal(nearestAnimal);
         }
+    }
+
+    // Eat the provided animal (handles biomass gain, hunger restore, notification and respawn trigger)
+    void EatAnimal(AnimalMetabolism animal)
+    {
+        if (animal == null) return;
+        string animalName = animal.gameObject.name;
+        float biomassTaken = animal.biomass;
+
+        // Kill the animal
+        animal.Die();
+
+        // Gain biomass from eating
+        float biomassGained = biomassTaken * trophicEfficiency;
+        biomass += biomassGained;
+        biomass = Mathf.Clamp(biomass, 0f, maxBiomass);
+
+        // Restore hunger
+        hunger += hungerGainPerAnimal;
+        hunger = Mathf.Clamp(hunger, 0f, maxHunger);
+
+        // Notify about hunting
+        if (EventNotificationUI.Instance != null)
+        {
+            EventNotificationUI.Instance.NotifyHumanHunt(gameObject.name, animalName);
+        }
+
+        // Trigger animal reproduction to balance ecosystem
+        // Trigger animal reproduction to balance ecosystem after a delay (10s)
+        StartCoroutine(DelayedAnimalReproduction(10f));
+
+        Debug.Log($"[HumanMetabolism] {gameObject.name} hunted {animalName}, gained {biomassGained:F1} kg biomass, +{hungerGainPerAnimal} hunger");
+    }
+
+    IEnumerator DelayedAnimalReproduction(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (AnimalRespawnManager.Instance != null)
+        {
+            AnimalRespawnManager.Instance.TriggerAnimalReproduction();
+        }
+    }
+
+    void MoveTowardsAnimal(AnimalMetabolism animal)
+    {
+        if (animal == null) return;
+        Vector2 targetPos = animal.transform.position;
+        float step = moveSpeed * Time.deltaTime;
+        Vector2 newPos = Vector2.MoveTowards(transform.position, targetPos, step);
+        transform.position = WorldBounds.ClampToLand(newPos);
+    }
+
+    void TryFindNearestAnimalTarget()
+    {
+        Collider2D[] colliders = Physics2D.OverlapCircleAll(transform.position, searchRadius);
+        AnimalMetabolism nearest = null;
+        float nearestDistance = float.MaxValue;
+
+        foreach (Collider2D col in colliders)
+        {
+            AnimalMetabolism animal = col.GetComponent<AnimalMetabolism>();
+            if (animal != null && animal.isAlive)
+            {
+                float distance = Vector2.Distance(transform.position, col.transform.position);
+                if (distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearest = animal;
+                }
+            }
+        }
+
+        targetAnimal = nearest;
+    }
+
+    void Wander()
+    {
+        wanderTimer += Time.deltaTime;
+        if (wanderTimer >= wanderInterval)
+        {
+            wanderTimer = 0f;
+            wanderTarget = (Vector2)transform.position + Random.insideUnitCircle * wanderRadius;
+        }
+
+        float step = (moveSpeed * 0.6f) * Time.deltaTime; // slower wandering
+        Vector2 newPos = Vector2.MoveTowards(transform.position, wanderTarget, step);
+        transform.position = WorldBounds.ClampToLand(newPos);
     }
     
     public void Die()
@@ -225,7 +413,13 @@ public class HumanMetabolism : MonoBehaviour
             atmosphere.UnregisterHumanAgent(this);
         }
         
-        //Debug.Log($"[HumanMetabolism] {gameObject.name} died (starvation)! Biomass: {biomass:F1} kg");
+        // Notify about death
+        if (EventNotificationUI.Instance != null)
+        {
+            EventNotificationUI.Instance.NotifyHumanDeath(gameObject.name);
+        }
+        
+        Debug.Log($"[HumanMetabolism] {gameObject.name} died (starvation)! Hunger: {hunger:F1}, Biomass: {biomass:F1} kg");
         
         SpriteRenderer sprite = GetComponent<SpriteRenderer>();
         if (sprite != null)
@@ -248,7 +442,8 @@ public class HumanMetabolism : MonoBehaviour
     
     void OnDrawGizmosSelected()
     {
-        Gizmos.color = biomass < hungerThreshold ? Color.red : Color.green;
+        float hungerPercent = (hunger / maxHunger) * 100f;
+        Gizmos.color = hungerPercent < hungerSearchThreshold ? Color.red : Color.green;
         Gizmos.DrawWireSphere(transform.position, searchRadius);
     }
 }

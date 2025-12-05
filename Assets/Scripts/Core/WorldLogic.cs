@@ -8,7 +8,8 @@ public class WorldLogic : MonoBehaviour
     public GameObject treePrefab;
     public GameObject grassPrefab;
     public GameObject animalPrefab;
-    public GameObject humanPrefab;
+    public GameObject manPrefab;
+    public GameObject womanPrefab;
     public GameObject sunPrefab;
     public GameObject moonPrefab;
     public GameObject oxygenPrefab;
@@ -19,15 +20,16 @@ public class WorldLogic : MonoBehaviour
     public int treeCount = 10; // Balanced for 24h cycle (was 5)
     public int grassCount = 55;      
     public int animalCount = 10;
-    public int humanCount = 1;
+    public int manCount = 1;
+    public int womanCount = 1;
     public int sunCount = 1;
     public int moonCount = 1;
     
 
     [Header("Spawn Settings")]
     public Vector2 padding = new Vector2(0.5f, 0.5f);
-    public float minSpacing = 0.75f;
-    public int maxTriesPerSpawn = 30;
+    public float minSpacing = 0.5f;
+    public int maxTriesPerSpawn = 100;
     
     [Header("Ocean Settings")]
     [Tooltip("Create ocean at bottom of map (20% of height)")]
@@ -66,11 +68,22 @@ public class WorldLogic : MonoBehaviour
     void Start()
     {
         SpawnOcean();      // Spawn ocean first (background layer)
+        
+        // Initialize world boundaries for animals to use
+        WorldBounds.Initialize(areaCenter, halfExtents, oceanTopY);
+        
         SpawnTrees();
         SpawnGrass();      // Spawn grass randomly (no longer around trees)
         SpawnAnimals();
-        SpawnHuman();
+        SpawnMen();
+        SpawnWomen();
         SpawnSunAndMoon();
+        
+        // Setup grass respawn manager
+        SetupGrassRespawn();
+        
+        // Setup human respawn manager
+        SetupHumanRespawn();
     }
     
     void SpawnOcean()
@@ -135,6 +148,7 @@ public class WorldLogic : MonoBehaviour
             if (TryGetFreePos(out Vector3 pos))
             {
                 GameObject grassObj = Instantiate(grassPrefab, pos, Quaternion.identity);
+                grassObj.name = $"Grass({i + 1})";  // Give each grass a unique name
                 occupied.Add(pos);
 
                 // Optional: slight rotation variation for natural look
@@ -142,6 +156,15 @@ public class WorldLogic : MonoBehaviour
 
                 // Add PlantAgent for scientific metabolism
                 AddPlantAgent(grassObj, PlantAgent.PlantType.Grass);
+
+                // Ensure grass has a collider for animal detection
+                if (grassObj.GetComponent<Collider2D>() == null)
+                {
+                    CircleCollider2D collider = grassObj.AddComponent<CircleCollider2D>();
+                    collider.radius = 0.3f;
+                    collider.isTrigger = true;
+                    Debug.Log($"[WorldLogic] Added CircleCollider2D to {grassObj.name}");
+                }
 
                 // Add emission capability (visual particles - grass emits more frequently than trees)
                 AddPlantEmitter(grassObj, 3f); // Grass emits every 3 seconds
@@ -262,15 +285,15 @@ public class WorldLogic : MonoBehaviour
         }
     }
 
-    void SpawnHuman()
+    void SpawnMen()
     {
-        if (!humanPrefab || humanCount <= 0) return;
+        if (!manPrefab || manCount <= 0) return;
 
-        for (int i = 0; i < humanCount; i++)
+        for (int i = 0; i < manCount; i++)
         {
             if (TryGetFreePos(out Vector3 pos))
             {
-                var go = Instantiate(humanPrefab, pos, Quaternion.identity);
+                var go = Instantiate(manPrefab, pos, Quaternion.identity);
                 occupied.Add(pos);
 
                 // Add gas exchange capability
@@ -279,15 +302,46 @@ public class WorldLogic : MonoBehaviour
                 // Add breathing animation (humans breathe slower and more visible)
                 AddBreathingAnimation(go, 1.2f, 0.06f);
 
-                // Reuse the same wander script (set different speed in Inspector if you like)
                 var mover = go.GetComponent<HumanAgent>();
                 if (mover)
                 {
                     mover.areaCenter = areaCenter;
                     mover.areaHalfExtents = halfExtents;
+                    mover.canMove = true; // Enable movement for breeding
+                    mover.seekMateForBreeding = true; // Enable mate-seeking
                 }
             }
-            else Debug.LogWarning("Could not find free spot for the human.");
+            else Debug.LogWarning("Could not find free spot for a man.");
+        }
+    }
+
+    void SpawnWomen()
+    {
+        if (!womanPrefab || womanCount <= 0) return;
+
+        for (int i = 0; i < womanCount; i++)
+        {
+            if (TryGetFreePos(out Vector3 pos))
+            {
+                var go = Instantiate(womanPrefab, pos, Quaternion.identity);
+                occupied.Add(pos);
+
+                // Add gas exchange capability
+                AddGasExchanger(go, GasExchanger.EntityType.Human);
+                
+                // Add breathing animation (humans breathe slower and more visible)
+                AddBreathingAnimation(go, 1.2f, 0.06f);
+
+                var mover = go.GetComponent<HumanAgent>();
+                if (mover)
+                {
+                    mover.areaCenter = areaCenter;
+                    mover.areaHalfExtents = halfExtents;
+                    mover.canMove = true; // Enable movement for breeding
+                    mover.seekMateForBreeding = true; // Enable mate-seeking
+                }
+            }
+            else Debug.LogWarning("Could not find free spot for a woman.");
         }
     }
 
@@ -296,14 +350,12 @@ public class WorldLogic : MonoBehaviour
         for (int t = 0; t < maxTriesPerSpawn; t++)
         {
             float x = Random.Range(-halfExtents.x, halfExtents.x);
-            float y = Random.Range(-halfExtents.y, halfExtents.y);
+            
+            // Only spawn above ocean (adjust Y range to avoid wasted attempts)
+            float minY = oceanTopY - areaCenter.y + 0.2f; // 0.2f buffer above water
+            float y = Random.Range(minY, halfExtents.y);
+            
             Vector3 candidate = new Vector3(areaCenter.x + x, areaCenter.y + y, 0f);
-
-            // Don't spawn in ocean area (below oceanTopY)
-            if (candidate.y < oceanTopY)
-            {
-                continue; // Try again
-            }
 
             bool tooClose = false;
             foreach (var used in occupied)
@@ -312,6 +364,27 @@ public class WorldLogic : MonoBehaviour
             }
             if (!tooClose) { pos = candidate; return true; }
         }
+        
+        // Fallback: Try again with relaxed spacing (50% of normal)
+        Debug.LogWarning($"[WorldLogic] Using fallback spawn with relaxed spacing. Occupied: {occupied.Count}");
+        float reducedSpacing = minSpacing * 0.5f;
+        
+        for (int t = 0; t < maxTriesPerSpawn; t++)
+        {
+            float x = Random.Range(-halfExtents.x, halfExtents.x);
+            float minY = oceanTopY - areaCenter.y + 0.2f;
+            float y = Random.Range(minY, halfExtents.y);
+            Vector3 candidate = new Vector3(areaCenter.x + x, areaCenter.y + y, 0f);
+
+            bool tooClose = false;
+            foreach (var used in occupied)
+            {
+                if (Vector2.Distance(candidate, used) < reducedSpacing) { tooClose = true; break; }
+            }
+            if (!tooClose) { pos = candidate; return true; }
+        }
+        
+        Debug.LogError($"[WorldLogic] FAILED to find free position after {maxTriesPerSpawn * 2} attempts! Occupied: {occupied.Count}");
         pos = default;
         return false;
     }
@@ -354,5 +427,44 @@ public class WorldLogic : MonoBehaviour
         ctrl.topMargin = 1f;
         ctrl.arcHeight = 1.5f;
         ctrl.horizontalPadding = 0.5f;
+    }
+    
+    void SetupGrassRespawn()
+    {
+        // Add GrassRespawnManager if it doesn't exist
+        GrassRespawnManager respawnManager = FindAnyObjectByType<GrassRespawnManager>();
+        if (respawnManager == null)
+        {
+            GameObject managerObj = new GameObject("GrassRespawnManager");
+            respawnManager = managerObj.AddComponent<GrassRespawnManager>();
+        }
+        
+        // Configure the manager
+        respawnManager.grassPrefab = grassPrefab;
+        respawnManager.worldLogic = this;
+        
+        Debug.Log("[WorldLogic] Grass respawn system initialized");
+    }
+    
+    void SetupHumanRespawn()
+    {
+        // Add HumanRespawnManager if it doesn't exist
+        HumanRespawnManager humanManager = FindAnyObjectByType<HumanRespawnManager>();
+        if (humanManager == null)
+        {
+            GameObject managerObj = new GameObject("HumanRespawnManager");
+            humanManager = managerObj.AddComponent<HumanRespawnManager>();
+        }
+        
+        // Configure the manager
+        humanManager.manPrefab = manPrefab;
+        humanManager.womanPrefab = womanPrefab;
+        humanManager.breedOncePerDay = true; // Breed once per day
+        humanManager.breedingDistance = 1.5f; // Man and woman must be within 1.5 units
+        humanManager.maxPopulation = 6;
+        humanManager.maxMen = 3;
+        humanManager.maxWomen = 3;
+        
+        Debug.Log("[WorldLogic] Human respawn system initialized (breeding-based reproduction)");
     }
 }

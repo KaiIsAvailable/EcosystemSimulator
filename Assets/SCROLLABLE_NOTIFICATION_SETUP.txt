@@ -1,0 +1,209 @@
+SCROLLABLE EVENT NOTIFICATION SETUP GUIDE (UPDATED)
+====================================================
+
+The notification system now saves ALL previous notifications and allows scrolling!
+Auto-configures components in code - minimal manual setup required!
+
+REQUIRED UI SETUP:
+------------------
+
+1. CREATE SCROLL VIEW:
+   - Right-click in Hierarchy → UI → Scroll View
+   - Name it "EventNotificationScrollView"
+   - Position: Bottom-Left corner of screen
+   - Size: Width: 350, Height: 200
+
+2. CONFIGURE SCROLL VIEW (EventNotificationScrollView):
+   - ScrollRect Component:
+     * Content: Drag "Content" GameObject here
+     * Viewport: Drag "Viewport" GameObject here
+     * Horizontal: ✗ (unchecked)
+     * Vertical: ✓ (checked)
+     * Movement Type: Elastic (auto-set by code)
+     * Scroll Sensitivity: 20 (auto-set by code)
+     * Vertical Scrollbar: Drag "Scrollbar Vertical" GameObject here
+     * Visibility: Permanent (auto-set by code)
+
+3. MODIFY VIEWPORT:
+   - Select "Viewport" child object
+   - MUST have Image component (even if transparent)
+     * Image: Any sprite or None (Background)
+     * Color: Transparent or white
+     * Raycast Target: ✓ (MUST be checked for mouse scrolling!)
+   - Mask component: ✓ (keeps content clipped)
+
+4. MODIFY CONTENT:
+   - Select "Content" child object (inside Viewport)
+   - ⚠️ CRITICAL: Delete Vertical Layout Group if it exists!
+   - Content Size Fitter (auto-added by code):
+     * Horizontal Fit: Unconstrained
+     * Vertical Fit: Preferred Size
+   
+   - Vertical Layout Group (auto-added by code):
+     * Child Alignment: Upper Left
+     * Control Child Size - Width: ✗
+     * Control Child Size - Height: ✗
+     * Child Force Expand - Width: ✓
+     * Child Force Expand - Height: ✗
+     * Spacing: 0
+     * Padding: Left 5, Right 5, Top 5, Bottom 5
+   
+   - RectTransform:
+     * Anchor: Stretch (all sides)
+     * Left: 0, Right: 0, Top: 0, Bottom: 0
+
+5. ADD TEXT TO CONTENT (MUST BE DIRECT CHILD!):
+   - ⚠️ IMPORTANT: NotificationText MUST be inside Content!
+   
+   Hierarchy should be:
+   EventNotificationScrollView
+   ├── Viewport
+   │   └── Content
+   │       └── NotificationText ← HERE!
+   └── Scrollbar Vertical
+   
+   - Select "Content" object
+   - Right-click → UI → Text (Legacy)
+   - Name it "NotificationText"
+   
+   - Text Component:
+     * Text: (leave empty)
+     * Font: LegacyRuntime (or Arial)
+     * Font Size: 12-14
+     * Color: Black
+     * Alignment: Left + Top
+     * Horizontal Overflow: Wrap
+     * Vertical Overflow: Overflow
+     * Best Fit: ✗ (unchecked)
+   
+   - RectTransform (auto-configured by code):
+     * Anchor: Stretch (all sides)
+     * Left: 0, Right: 0, Top: 0, Bottom: 0
+     * Offset Min: (0, 0)
+     * Offset Max: (0, 0)
+   
+   - Layout Element (auto-added by code):
+     * Min Height: 100
+     * Preferred Height: -1
+     * Flexible Height: 1
+
+6. ADD EVENTNOTIFICATIONUI SCRIPT:
+   - Create an empty GameObject or use existing one
+   - Name it "EventSystem" (or any name)
+   - Add Component → EventNotificationUI script
+   
+   - Assign References in Inspector:
+     * Notification Text → Drag "NotificationText" GameObject here
+     * Scroll Rect → Drag "EventNotificationScrollView" GameObject here
+   
+   - Settings:
+     * Max History Size: 100 (keeps last 100 notifications, 0 = unlimited)
+     * Show Notifications: ✓
+     * Auto Scroll To Bottom: ✓
+
+7. SCROLLBAR CONFIGURATION:
+   - "Scrollbar Vertical" is automatically created with Scroll View
+   - Make sure it's assigned in ScrollRect component (step 2)
+   - Visibility is set to PERMANENT by code (always visible)
+   - You can customize color/size in Inspector
+
+AUTOMATIC CONFIGURATION (Done by Code):
+----------------------------------------
+The EventNotificationUI script automatically sets up:
+✅ ContentSizeFitter on Content (Vertical=PreferredSize)
+✅ VerticalLayoutGroup on Content (proper spacing/padding)
+✅ LayoutElement on NotificationText (min height 100px)
+✅ RectTransform anchors on NotificationText (stretch to fill)
+✅ ScrollRect settings (sensitivity=20, movement=Elastic)
+✅ Scrollbar visibility (Permanent)
+✅ Viewport raycast enabled (for mouse scrolling)
+
+You DON'T need to manually add these - just ensure the basic structure exists!
+
+SCROLLING CONTROLS:
+-------------------
+- Mouse Wheel: Scroll up/down
+- Click & Drag: Drag the content area
+- Mobile: Touch & swipe
+
+FEATURES:
+---------
+✅ Saves ALL previous notifications (up to max history)
+✅ Scroll up to see old events
+✅ Scroll down to see new events
+✅ Auto-scrolls to bottom when new notification arrives
+✅ Shows unlimited history (configurable via Max History Size)
+
+EXAMPLE LAYOUT:
+---------------
+
+┌──────────────────────────────────┐
+│ [Scroll View - 350×200px]        │
+│ ┌────────────────────────────┐ ▲ │
+│ │ [EAT] Animal(1) ate Grass  │ █ │
+│ │ [CONSUMED] Grass(1) eaten  │ █ │ ← Scrollbar
+│ │ [GROW] Grass(56) grew      │ █ │
+│ │ [EAT] Animal(2) ate Grass  │ █ │
+│ │ [STARVING] Animal(3)!      │ █ │
+│ │ [DEATH] Animal(3) died     │ ▼ │
+│ └────────────────────────────┘   │
+└──────────────────────────────────┘
+
+TESTING:
+--------
+1. Run game and check Console for debug messages:
+   - "[EventNotificationUI] ScrollRect found on: ..."
+   - "[EventNotificationUI] Content assigned: ..."
+   - "[EventNotificationUI] ContentSizeFitter configured: ..."
+   - "[EventNotificationUI] Added VerticalLayoutGroup to Content"
+   - "[EventNotificationUI] Viewport raycast enabled"
+
+2. If you see errors about missing references:
+   - Check ScrollRect component has Content/Viewport/Scrollbar assigned
+   - Check NotificationText is INSIDE Content (as direct child)
+   - Check Viewport has Image component
+
+3. Watch notifications appear automatically
+4. Try scrolling with mouse wheel
+5. Drag the scrollbar
+6. Scroll up to see older notifications
+7. New notifications auto-scroll to bottom
+
+TROUBLESHOOTING:
+----------------
+❌ "Coroutine couldn't be started because the game object is inactive"
+   → The Activities Log panel was hidden. Press R to show it.
+   → Code now handles this - notifications save even when panel hidden.
+
+❌ "Scrollbar not showing"
+   → Make sure Scrollbar Vertical is assigned in ScrollRect component
+   → Code forces visibility to Permanent automatically
+
+❌ "Can't scroll / Nothing happens when scrolling"
+   → Viewport MUST have Image component with Raycast Target checked!
+   → Content needs ContentSizeFitter + LayoutElement (auto-added by code)
+   → NotificationText must be INSIDE Content as direct child
+
+❌ "Text stuck in top-left corner"
+   → Code now sets anchors to stretch (0,0) to (1,1)
+   → RectTransform offset should be zero on all sides
+
+❌ "Content not expanding"
+   → Check ContentSizeFitter on Content: Vertical Fit = Preferred Size
+   → Check LayoutElement on NotificationText: Min Height = 100
+
+CUSTOMIZATION:
+--------------
+- Increase Max History Size for longer history (e.g., 500)
+- Set to 0 for unlimited history (may impact performance)
+- Disable Auto Scroll if you want manual scrolling only
+- Scroll Sensitivity is auto-set to 20 (adjust in code if needed)
+- Change notification colors in EventNotificationUI methods
+
+KEYBOARD SHORTCUTS:
+-------------------
+- Press R: Toggle Activities Log visibility
+- Press E: Toggle Ecosystem Dashboard visibility
+
+DONE! You can now scroll through all game events! 🎉
+Notifications are saved even when panel is hidden!
