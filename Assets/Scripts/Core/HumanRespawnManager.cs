@@ -1,4 +1,6 @@
 using UnityEngine;
+using System.Collections.Generic;
+using System.Linq; // Added for simplified array functions
 
 /// <summary>
 /// Manages human population by spawning men/women to maintain balance.
@@ -74,6 +76,16 @@ public class HumanRespawnManager : MonoBehaviour
         // Monitor active breeding pair
         if (seekingMan != null && targetWoman != null)
         {
+            // Ensure they are both alive and available
+            if (!seekingMan.gameObject.activeInHierarchy || !targetWoman.gameObject.activeInHierarchy || 
+                !seekingMan.GetComponent<HumanMetabolism>().isAlive || !targetWoman.GetComponent<HumanMetabolism>().isAlive)
+            {
+                seekingMan.StopSeeking();
+                seekingMan = null;
+                targetWoman = null;
+                return;
+            }
+
             // Check if they're close enough to breed
             float distance = Vector3.Distance(seekingMan.transform.position, targetWoman.transform.position);
             
@@ -83,12 +95,13 @@ public class HumanRespawnManager : MonoBehaviour
                 HumanMetabolism father = seekingMan.GetComponent<HumanMetabolism>();
                 HumanMetabolism mother = targetWoman.GetComponent<HumanMetabolism>();
                 
+                // Final check before spawning
                 if (father != null && mother != null && father.isAlive && mother.isAlive)
                 {
                     SpawnChild(father, mother);
                 }
                 
-                // Stop seeking
+                // Stop seeking and reset pair
                 seekingMan.StopSeeking();
                 seekingMan = null;
                 targetWoman = null;
@@ -106,33 +119,11 @@ public class HumanRespawnManager : MonoBehaviour
     
     void AssignBreedingPair()
     {
-        // Find all alive men and women
-        HumanMetabolism[] allHumans = FindObjectsOfType<HumanMetabolism>();
-        System.Collections.Generic.List<HumanAgent> men = new System.Collections.Generic.List<HumanAgent>();
-        System.Collections.Generic.List<HumanAgent> women = new System.Collections.Generic.List<HumanAgent>();
+        // Find all alive HumanAgents
+        HumanAgent[] allAgents = FindObjectsOfType<HumanAgent>().Where(a => a.GetComponent<HumanMetabolism>().isAlive).ToArray();
         
-        foreach (var human in allHumans)
-        {
-            if (!human.isAlive) continue;
-            
-            HumanAgent agent = human.GetComponent<HumanAgent>();
-            if (agent == null) continue;
-            
-            // Identify gender by sprite color
-            SpriteRenderer sr = human.GetComponent<SpriteRenderer>();
-            if (sr != null)
-            {
-                Color color = sr.color;
-                if (color.r > color.b && color.g > color.b) // Yellow = man
-                {
-                    men.Add(agent);
-                }
-                else if (color.r > color.g && color.r > 0.5f) // Pink = woman
-                {
-                    women.Add(agent);
-                }
-            }
-        }
+        List<HumanAgent> men = allAgents.Where(a => a.isMale).ToList();
+        List<HumanAgent> women = allAgents.Where(a => !a.isMale).ToList();
         
         // Need at least 1 man and 1 woman
         if (men.Count == 0 || women.Count == 0)
@@ -157,118 +148,17 @@ public class HumanRespawnManager : MonoBehaviour
     
     void UpdatePopulationCounts()
     {
-        // Count alive humans by checking their names or components
-        currentMenCount = 0;
-        currentWomenCount = 0;
+        // Rely on the isMale variable on HumanAgent
+        HumanAgent[] allAgents = FindObjectsOfType<HumanAgent>().Where(a => a.GetComponent<HumanMetabolism>()?.isAlive == true).ToArray();
         
-        // Find all humans with HumanMetabolism component
-        HumanMetabolism[] allHumans = FindObjectsOfType<HumanMetabolism>();
+        currentMenCount = allAgents.Count(a => a.isMale);
+        currentWomenCount = allAgents.Count(a => !a.isMale);
         
-        foreach (var human in allHumans)
-        {
-            if (!human.isAlive) continue;
-            
-            // Try to identify gender by checking sprite color or other distinguishing features
-            string name = human.gameObject.name.ToLower();
-            
-            // Check sprite renderer color to distinguish gender
-            SpriteRenderer sr = human.GetComponent<SpriteRenderer>();
-            if (sr != null)
-            {
-                Color color = sr.color;
-                
-                // Yellow/warm colors = man, Pink/cool colors = woman
-                if (color.r > color.b && color.g > color.b) // More red+green than blue = yellow = man
-                {
-                    currentMenCount++;
-                    Debug.Log($"[UpdatePopulation] {human.gameObject.name} counted as MAN (color: {color})");
-                }
-                else if (color.r > color.g && color.r > 0.5f) // More red = pink = woman
-                {
-                    currentWomenCount++;
-                    Debug.Log($"[UpdatePopulation] {human.gameObject.name} counted as WOMAN (color: {color})");
-                }
-                else
-                {
-                    Debug.LogWarning($"[UpdatePopulation] {human.gameObject.name} - Cannot determine gender from color: {color}");
-                }
-            }
-            else
-            {
-                Debug.LogWarning($"[UpdatePopulation] {human.gameObject.name} has no SpriteRenderer!");
-            }
-        }
+        // Automatically adjust max counts if maxPopulation is odd
+        maxMen = Mathf.CeilToInt(maxPopulation / 2f);
+        maxWomen = Mathf.FloorToInt(maxPopulation / 2f);
         
         Debug.Log($"[HumanRespawnManager] Current population: {currentMenCount} men, {currentWomenCount} women (Total: {currentMenCount + currentWomenCount})");
-    }
-    
-    void TrySpawnHuman()
-    {
-        int totalPopulation = currentMenCount + currentWomenCount;
-        
-        // Check if we've reached max population
-        if (totalPopulation >= maxPopulation)
-        {
-            Debug.Log($"[HumanRespawnManager] Max population reached ({totalPopulation}/{maxPopulation}). No spawn.");
-            return;
-        }
-        
-        // Find all alive men and women
-        HumanMetabolism[] allHumans = FindObjectsOfType<HumanMetabolism>();
-        System.Collections.Generic.List<HumanMetabolism> men = new System.Collections.Generic.List<HumanMetabolism>();
-        System.Collections.Generic.List<HumanMetabolism> women = new System.Collections.Generic.List<HumanMetabolism>();
-        
-        foreach (var human in allHumans)
-        {
-            if (!human.isAlive) continue;
-            
-            // Identify gender by sprite color
-            SpriteRenderer sr = human.GetComponent<SpriteRenderer>();
-            if (sr != null)
-            {
-                Color color = sr.color;
-                string humanName = human.gameObject.name;
-                Debug.Log($"[HumanRespawnManager] Checking human: '{humanName}' (color: {color})");
-                
-                // Yellow/warm colors = man, Pink/cool colors = woman
-                if (color.r > color.b && color.g > color.b) // More red+green than blue = yellow = man
-                {
-                    men.Add(human);
-                    Debug.Log($"  -> Identified as MAN (yellow color)");
-                }
-                else if (color.r > color.g && color.r > 0.5f) // More red = pink = woman
-                {
-                    women.Add(human);
-                    Debug.Log($"  -> Identified as WOMAN (pink color)");
-                }
-                else
-                {
-                    Debug.LogWarning($"  -> Could not identify gender from color: {color}");
-                }
-            }
-        }
-        
-        Debug.Log($"[HumanRespawnManager] Found {men.Count} men, {women.Count} women alive");
-        
-        // Try to find a breeding pair
-        foreach (var man in men)
-        {
-            foreach (var woman in women)
-            {
-                float distance = Vector2.Distance(man.transform.position, woman.transform.position);
-                Debug.Log($"[HumanRespawnManager] {man.gameObject.name} <-> {woman.gameObject.name}: distance = {distance:F2} (need ≤{breedingDistance})");
-                
-                if (distance <= breedingDistance)
-                {
-                    // Found a breeding pair! Spawn a child
-                    SpawnChild(man, woman);
-                    return;
-                }
-            }
-        }
-        
-        // No breeding pair found close enough
-        Debug.Log($"[HumanRespawnManager] No breeding pair within {breedingDistance} units found");
     }
     
     /// <summary>
@@ -277,16 +167,19 @@ public class HumanRespawnManager : MonoBehaviour
     /// </summary>
     void SpawnChild(HumanMetabolism father, HumanMetabolism mother)
     {
+        UpdatePopulationCounts(); // Re-run counts right before spawn
+        
         // Determine child gender based on population balance
         bool spawnMale = ShouldSpawnMan();
         
+        // Override check based on capacity
         if (spawnMale && currentMenCount >= maxMen)
         {
-            spawnMale = false; // Max men reached, spawn female instead
+            spawnMale = false; 
         }
         else if (!spawnMale && currentWomenCount >= maxWomen)
         {
-            spawnMale = true; // Max women reached, spawn male instead
+            spawnMale = true; 
         }
         
         GameObject prefab = spawnMale ? manPrefab : womanPrefab;
@@ -300,28 +193,32 @@ public class HumanRespawnManager : MonoBehaviour
         Vector3 midpoint = (father.transform.position + mother.transform.position) / 2f;
         Vector3 spawnPos = midpoint + new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), 0f);
         
+        // CRITICAL FIX: Ensure child spawns on land
+        spawnPos = WorldBounds.ClampToLand(spawnPos); 
+        
         GameObject child = Instantiate(prefab, spawnPos, Quaternion.identity);
         
-        // Enable movement for newborn
+        // Update new child's isMale flag based on what was spawned
         HumanAgent childAgent = child.GetComponent<HumanAgent>();
+        HumanMetabolism childMetabolism = child.GetComponent<HumanMetabolism>();
+        
         if (childAgent != null)
         {
-            childAgent.canMove = true;
-            childAgent.seekMateForBreeding = true;
-            
-            // Copy parent boundaries
-            HumanAgent fatherAgent = father.GetComponent<HumanAgent>();
-            if (fatherAgent != null)
-            {
-                childAgent.areaCenter = fatherAgent.areaCenter;
-                childAgent.areaHalfExtents = fatherAgent.areaHalfExtents;
-            }
+            childAgent.isMale = spawnMale; // Set the reliable flag
+            childAgent.canMove = true; // Enable movement
+            // childAgent.seekMateForBreeding = true; // Default should be true from prefab
+        }
+        
+        // Reset hunger/biomass (optional, usually done in prefab or HumanMetabolism.Start)
+        if (childMetabolism != null)
+        {
+            childMetabolism.hunger = childMetabolism.maxHunger * 0.8f; // Start with energy
         }
         
         string gender = spawnMale ? "boy" : "girl";
         string childName = child.name;
         
-        // Update counts
+        // Update counts (these are handled again in the next daily check, but helpful for immediate debug)
         if (spawnMale)
             currentMenCount++;
         else
@@ -359,75 +256,19 @@ public class HumanRespawnManager : MonoBehaviour
         }
     }
     
-    void SpawnMan()
-    {
-        if (manPrefab == null)
-        {
-            Debug.LogWarning("[HumanRespawnManager] Man prefab not assigned!");
-            return;
-        }
-        
-        Vector3 spawnPos = GetRandomLandPosition();
-        GameObject man = Instantiate(manPrefab, spawnPos, Quaternion.identity);
-        
-        currentMenCount++;
-        
-        Debug.Log($"[HumanRespawnManager] Spawned MAN at {spawnPos}. Population: {currentMenCount} men, {currentWomenCount} women");
-        
-        // Notify UI
-        if (EventNotificationUI.Instance != null)
-        {
-            EventNotificationUI.Instance.AddNotification($"[BIRTH] {man.name} born (Day {GetCurrentDay()})", new Color(0.2f, 0.8f, 0.2f));
-        }
-    }
-    
-    void SpawnWoman()
-    {
-        if (womanPrefab == null)
-        {
-            Debug.LogWarning("[HumanRespawnManager] Woman prefab not assigned!");
-            return;
-        }
-        
-        Vector3 spawnPos = GetRandomLandPosition();
-        GameObject woman = Instantiate(womanPrefab, spawnPos, Quaternion.identity);
-        
-        currentWomenCount++;
-        
-        Debug.Log($"[HumanRespawnManager] Spawned WOMAN at {spawnPos}. Population: {currentMenCount} men, {currentWomenCount} women");
-        
-        // Notify UI
-        if (EventNotificationUI.Instance != null)
-        {
-            EventNotificationUI.Instance.AddNotification($"[BIRTH] {woman.name} born (Day {GetCurrentDay()})", new Color(0.2f, 0.8f, 0.2f));
-        }
-    }
-    
-    Vector3 GetRandomLandPosition()
-    {
-        if (WorldBounds.IsInitialized)
-        {
-            Vector3 center = WorldBounds.areaCenter;
-            Vector2 half = WorldBounds.areaHalfExtents;
-
-            float x = Random.Range(center.x - half.x, center.x + half.x);
-            float y = Random.Range(WorldBounds.oceanTopY + 0.2f, center.y + half.y);
-            Vector3 candidate = new Vector3(x, y, 0f);
-            return WorldBounds.ClampToLand(candidate);
-        }
-
-        // Fallback near origin
-        return new Vector3(Random.Range(-2f, 2f), Random.Range(-2f, 2f), 0f);
-    }
+    // Removed old SpawnMan/SpawnWoman functions as they were not used in the final logic
+    // and relied on external, unused counting variables.
     
     int GetCurrentDay()
     {
-        // Calculate current day based on elapsed time
+        // Get current day from SunMoonController
         var sunMoon = FindAnyObjectByType<SunMoonController>();
         if (sunMoon != null)
         {
-            return Mathf.FloorToInt(Time.time / sunMoon.fullDaySeconds);
+            return sunMoon.day; // Assuming SunMoonController tracks currentDay
         }
-        return Mathf.FloorToInt(Time.time / 120f); // Fallback: 120 seconds per day
+        
+        // Fallback: Calculate current day based on elapsed time (less accurate if simulation speed changes)
+        return Mathf.FloorToInt(Time.time / 120f); 
     }
 }

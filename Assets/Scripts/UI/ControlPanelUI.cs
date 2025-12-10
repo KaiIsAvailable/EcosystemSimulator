@@ -83,6 +83,21 @@ public class ControlPanelUI : MonoBehaviour
         Vector3 pos = GetRandomLandPosition();
         GameObject go = Instantiate(prefab, pos, Quaternion.identity);
         
+        // --- CRITICAL FIX START ---
+        HumanMetabolism hm = go.GetComponent<HumanMetabolism>();
+        if (hm != null)
+        {
+            // Force the human to use its built-in movement/hunting AI.
+            // This bypasses the default 'false' setting which assumes an external controller.
+            hm.useOwnMovement = true; 
+            
+            // Ensure they start off with full energy (optional, but prevents immediate death)
+            hm.hunger = hm.maxHunger; 
+            
+            Debug.Log($"[ControlPanelUI] Initialized {go.name} for autonomous survival.");
+        }
+        // --- CRITICAL FIX END ---
+        
         string genderName = go.name.Contains("Man") || go.name.Contains("man") ? "Man" : "Woman";
         Debug.Log($"[ControlPanelUI] Spawned {genderName} at {pos}");
 

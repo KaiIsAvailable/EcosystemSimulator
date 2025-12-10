@@ -11,9 +11,8 @@ GameObject:
   - component: {fileID: 3183211239345376905}
   - component: {fileID: 947558742130227057}
   - component: {fileID: 597315107291645068}
-  - component: {fileID: -7049636629033538549}
   - component: {fileID: -2213367140393274577}
-  - component: {fileID: 4528371953211687643}
+  - component: {fileID: -3372016854012358727}
   m_Layer: 0
   m_Name: Grass
   m_TagString: Untagged
@@ -127,30 +126,6 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0.21133333}
   m_Radius: 0.25
---- !u!114 &-7049636629033538549
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8216876298259141216}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b9cf4afdf039ce647b1882550125e805, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  entityType: 0
-  currentEnergy: 100
-  maxEnergy: 100
-  respirationLossRate: 0.1
-  photosynthesisGainRate: 0.8
-  eatingAmount: 10
-  searchRadius: 2
-  searchInterval: 2
-  trophicEfficiency: 0.15
-  isAlive: 1
-  isHungry: 0
-  hungerThreshold: 50
 --- !u!114 &-2213367140393274577
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -204,7 +179,7 @@ MonoBehaviour:
     - rid: 2340870476025036868
       type: {class: ShadowShape2DProvider_SpriteRenderer, ns: UnityEngine.Rendering.Universal, asm: Unity.RenderPipelines.Universal.2D.Runtime}
       data: 
---- !u!114 &4528371953211687643
+--- !u!114 &-3372016854012358727
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -216,20 +191,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 34e11c55877b89447b830623c9cd102c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  plantType: 1
-  R_base: 0.015
+  plantType: 0
+  R_base: 0.00072
   Q10_factor: 2.5
   L_comp_ratio: 0.1
   L_sat_ratio: 0.9
-  P_max: 0.25
-  metabolismScale: 0.1
+  P_max: 0.0108
+  metabolismScale: 1
   biomass: 10
+  maxBiomass: 500
   verticalLayerH: 0
   localTemperature: 20
   localLight: 1
   R_total: 0
   P_gross: 0
   P_net: 0
-  minBiomass: 0.1
+  minBiomass: 1
   enableDeath: 1
   autoRegister: 1

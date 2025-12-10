@@ -11,9 +11,8 @@ GameObject:
   - component: {fileID: 3183211239345376905}
   - component: {fileID: 947558742130227057}
   - component: {fileID: 7084240228732950115}
-  - component: {fileID: 8204633241609230439}
   - component: {fileID: -5788834155241249522}
-  - component: {fileID: -642202061124258058}
+  - component: {fileID: -1394155656096129760}
   m_Layer: 0
   m_Name: Tree
   m_TagString: Untagged
@@ -127,30 +126,6 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0.023307204}
   m_Radius: 0.4
---- !u!114 &8204633241609230439
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8216876298259141216}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b9cf4afdf039ce647b1882550125e805, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  entityType: 0
-  currentEnergy: 100
-  maxEnergy: 100
-  respirationLossRate: 0.1
-  photosynthesisGainRate: 0.8
-  eatingAmount: 10
-  searchRadius: 2
-  searchInterval: 2
-  trophicEfficiency: 0.15
-  isAlive: 1
-  isHungry: 0
-  hungerThreshold: 50
 --- !u!114 &-5788834155241249522
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -204,7 +179,7 @@ MonoBehaviour:
     - rid: 2340870476025036870
       type: {class: ShadowShape2DProvider_SpriteRenderer, ns: UnityEngine.Rendering.Universal, asm: Unity.RenderPipelines.Universal.2D.Runtime}
       data: 
---- !u!114 &-642202061124258058
+--- !u!114 &-1394155656096129760
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -217,19 +192,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   plantType: 0
-  R_base: 0.015
+  R_base: 0.00072
   Q10_factor: 2.5
   L_comp_ratio: 0.1
   L_sat_ratio: 0.9
-  P_max: 0.25
-  metabolismScale: 0.1
+  P_max: 0.0108
+  metabolismScale: 1
   biomass: 10
+  maxBiomass: 500
   verticalLayerH: 0
   localTemperature: 20
   localLight: 1
   R_total: 0
   P_gross: 0
   P_net: 0
-  minBiomass: 0.1
+  minBiomass: 1
   enableDeath: 1
   autoRegister: 1

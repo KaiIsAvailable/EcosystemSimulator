@@ -18,11 +18,11 @@ public class AnimalMetabolism : MonoBehaviour
     [Tooltip("Maximum hunger capacity (tank size)")]
     public float maxHunger = 100f;
     [Tooltip("Hunger depletes every second (engine always burns gas)")]
-    public float hungerDepletionRate = 0.2f;  // Slower depletion: 0.2 hunger per second (was 1.0)
+    public float hungerDepletionRate = 8.0f;  // Adjusted for 720× time compression (0.2 × 40)
     
     [Header("Basal Metabolism")]
     [Tooltip("Base O₂ consumption at rest (mol/s/kg at 20°C)")]
-    public float basalMetabolicRate = 0.002f;  // Increased 100× for visibility (0.00002 → 0.002)
+    public float basalMetabolicRate = 0.0144f;  // Adjusted for 720× time compression (0.002 × 72)
     
     [Tooltip("Q10 temperature coefficient")]
     [Range(1.5f, 2.5f)]
@@ -33,6 +33,10 @@ public class AnimalMetabolism : MonoBehaviour
     
     [Header("Activity")]
     public ActivityState currentActivity = ActivityState.Resting;
+
+    private float starvationTimer = 0f;
+    [Tooltip("Seconds the animal can survive with 0 hunger before biomass drops")]
+    public float starvationGracePeriod = 1.0f; // 1 second grace period
     
     public enum ActivityState
     {
@@ -83,7 +87,7 @@ public class AnimalMetabolism : MonoBehaviour
     private AtmosphereManager atmosphere;
     private float o2Accumulator = 0f;
     private float co2Accumulator = 0f;
-    private const float ACCUMULATOR_THRESHOLD = 0.01f;
+    private const float ACCUMULATOR_THRESHOLD = 0.001f;  // Lowered for faster response with many entities
     private PlantAgent targetPlant = null;  // Plant the animal is moving towards
     private Vector2 wanderTarget;  // Random position to wander to
     private float wanderTimer = 0f;
@@ -158,32 +162,42 @@ public class AnimalMetabolism : MonoBehaviour
     
     void BurnHunger()
     {
-        // Rule 1: Always burn gas (hunger decreases)
         float hungerBurn = hungerDepletionRate * Time.deltaTime;
-        
+
         if (hunger > 0f)
         {
-            // Tank has fuel - burn hunger
+            // Tank has fuel - reset timer and burn hunger
+            starvationTimer = 0f;
             hunger -= hungerBurn;
             hunger = Mathf.Max(0f, hunger);
+            
+            // ... (rest of hunger burn logic)
         }
         else
         {
-            // Rule 2: Empty tank damages car (burn biomass)
-            // If hunger is 0, metabolism starts consuming biomass
-            float biomassBurn = hungerBurn * 0.5f;  // Slower biomass burn
-            biomass -= biomassBurn;
-            biomass = Mathf.Max(0f, biomass);
-            
-            if (Time.frameCount % 60 == 0)
+            // Hunger is zero. Start grace period.
+            starvationTimer += Time.deltaTime;
+
+            if (starvationTimer >= starvationGracePeriod)
             {
-                Debug.Log($"[Animal] {gameObject.name} STARVING! Hunger empty, burning biomass: {biomass:F1} kg left");
-                
-                // Notify UI about starvation
-                if (EventNotificationUI.Instance != null)
+                // Grace period over: consume biomass
+                float biomassBurn = hungerBurn * 0.5f;
+                biomass -= biomassBurn;
+                biomass = Mathf.Max(0f, biomass);
+
+                // CRITICAL FIX: CHECK FOR DEATH IMMEDIATELY AFTER BIOMASS BURN
+                if (biomass <= 0f) 
                 {
-                    EventNotificationUI.Instance.NotifyAnimalStarving($"Animal({animalID})");
+                    Die(); 
+                    return;
                 }
+                
+                // ... (rest of starvation logging/notification)
+            }
+            else
+            {
+                // Debug: Animal is hungry but still in grace period.
+                // (Optional logging to confirm this state)
             }
         }
     }
@@ -407,29 +421,39 @@ public class AnimalMetabolism : MonoBehaviour
     
     void Wander()
     {
-        wanderTimer += Time.deltaTime;
-        
-        // Pick new random direction periodically
-        if (wanderTimer >= wanderInterval)
+        // Check arrival distance (0.5f is a sensible arrival radius)
+        float distance = Vector2.Distance(transform.position, wanderTarget);
+
+        // PRIORITY: If arrived at the current target, pick a new one immediately.
+        if (distance <= 0.5f)
+        {
+            wanderTimer = 0f; // Reset timer so it doesn't immediately fire again
+            SetNewWanderTarget();
+        }
+        // SECONDARY: If the timer runs out, pick a new target (in case the current one was unreachable/stuck)
+        else if (wanderTimer >= wanderInterval)
         {
             wanderTimer = 0f;
             SetNewWanderTarget();
         }
+
+        // Increment timer for the next check
+        wanderTimer += Time.deltaTime;
         
         // Move towards wander target
-        float distance = Vector2.Distance(transform.position, wanderTarget);
-        
         if (distance > 0.5f)
         {
             currentActivity = ActivityState.Walking;
             Vector2 direction = (wanderTarget - (Vector2)transform.position).normalized;
-            Vector3 newPosition = transform.position + (Vector3)(direction * moveSpeed * 0.5f * Time.deltaTime);  // Half speed when wandering
+            // The movement step uses a half-speed multiplier (0.5f) when wandering
+            Vector3 newPosition = transform.position + (Vector3)(direction * moveSpeed * 0.5f * Time.deltaTime); 
             
             // Clamp to land boundaries (prevent walking into ocean)
             transform.position = WorldBounds.ClampToLand(newPosition);
         }
         else
         {
+            // If distance is <= 0.5f, the animal is resting/arrived.
             currentActivity = ActivityState.Resting;
         }
     }

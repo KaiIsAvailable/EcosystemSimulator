@@ -1,4 +1,6 @@
 using UnityEngine;
+using System.Collections;
+using System.Linq; // Added for simplified array manipulation
 
 /// <summary>
 /// Manages animal reproduction to balance the ecosystem.
@@ -14,7 +16,7 @@ public class AnimalRespawnManager : MonoBehaviour
     public int parentsRequired = 2;
     
     [Tooltip("Maximum number of animals allowed in the world. Reproduction will be skipped when this limit is reached.")]
-    public int maxAnimals = 10;
+    public int maxAnimals = 30;
     
     [Tooltip("Starting hunger percentage for newborns (0-1)")]
     [Range(0f, 1f)]
@@ -66,20 +68,28 @@ public class AnimalRespawnManager : MonoBehaviour
         int parent1Index = Random.Range(0, aliveAnimals.Length);
         int parent2Index = Random.Range(0, aliveAnimals.Length);
         
-        // Make sure they're different
-        while (parent2Index == parent1Index && aliveAnimals.Length > 1)
+        // Ensure parent 2 is different from parent 1, if possible
+        if (aliveAnimals.Length > 1)
         {
-            parent2Index = Random.Range(0, aliveAnimals.Length);
+            while (parent2Index == parent1Index)
+            {
+                parent2Index = Random.Range(0, aliveAnimals.Length);
+            }
         }
         
         AnimalMetabolism parent1 = aliveAnimals[parent1Index];
         AnimalMetabolism parent2 = aliveAnimals[parent2Index];
         
-        // Spawn new animal between parents
+        // Calculate birth position
         Vector3 birthPosition = (parent1.transform.position + parent2.transform.position) / 2f;
+        
+        // Apply random offset
         birthPosition += new Vector3(Random.Range(-spawnOffset, spawnOffset), Random.Range(-spawnOffset, spawnOffset), 0f);
         
-        // Instantiate new animal
+        // CRITICAL FIX: Clamp to land before instantiation
+        birthPosition = WorldBounds.ClampToLand(birthPosition);
+        
+        // Instantiate new animal (cloning an existing one preserves the prefab link)
         GameObject newAnimal = Instantiate(parent1.gameObject, birthPosition, Quaternion.identity);
         AnimalMetabolism newAnimalScript = newAnimal.GetComponent<AnimalMetabolism>();
         
@@ -104,69 +114,83 @@ public class AnimalRespawnManager : MonoBehaviour
         }
     }
 
-        /// <summary>
-        /// Spawn an animal immediately, bypassing the maxAnimals cap.
-        /// This is intended for manual / developer-triggered spawns.
-        /// </summary>
-        public void SpawnAnimalImmediate()
+    /// <summary>
+    /// Spawn an animal immediately, bypassing the maxAnimals cap.
+    /// This is intended for manual / developer-triggered spawns.
+    /// </summary>
+    public void SpawnAnimalImmediate()
+    {
+        // Try to spawn by cloning a random existing animal if possible
+        AnimalMetabolism[] allAnimals = FindObjectsOfType<AnimalMetabolism>();
+        AnimalMetabolism[] aliveAnimals = System.Array.FindAll(allAnimals, a => a.isAlive);
+
+        GameObject newAnimal = null;
+        Vector3 spawnPos = Vector3.zero;
+
+        if (aliveAnimals.Length >= 1)
         {
-            // Try to spawn by cloning a random existing animal if possible
-            AnimalMetabolism[] allAnimals = FindObjectsOfType<AnimalMetabolism>();
-            AnimalMetabolism[] aliveAnimals = System.Array.FindAll(allAnimals, a => a.isAlive);
+            // Clone a random alive animal as a template
+            AnimalMetabolism template = aliveAnimals[Random.Range(0, aliveAnimals.Length)];
+            
+            // Calculate a random spawn position near the template, clamped to land
+            spawnPos = template.transform.position + new Vector3(
+                Random.Range(-spawnOffset, spawnOffset), 
+                Random.Range(-spawnOffset, spawnOffset), 
+                0f
+            );
+            
+            // CRITICAL FIX: Clamp position after calculating offset
+            spawnPos = WorldBounds.ClampToLand(spawnPos); 
 
-            GameObject newAnimal = null;
-
-            if (aliveAnimals.Length >= 1)
+            newAnimal = Instantiate(template.gameObject, spawnPos, Quaternion.identity);
+        }
+        else
+        {
+            // No template animals available - try to use WorldLogic's prefab
+            WorldLogic world = FindAnyObjectByType<WorldLogic>();
+            if (world != null && world.animalPrefab != null)
             {
-                // Clone the first alive animal as a simple immediate spawn
-                AnimalMetabolism template = aliveAnimals[Random.Range(0, aliveAnimals.Length)];
-                Vector3 spawnPos = WorldBounds.IsInitialized ? (Vector3)WorldBounds.areaCenter : template.transform.position;
+                // CRITICAL FIX: Ensure WorldBounds is initialized before trying to use it
                 if (WorldBounds.IsInitialized)
                 {
-                    // pick a random nearby offset
-                    spawnPos = template.transform.position + new Vector3(Random.Range(-spawnOffset, spawnOffset), Random.Range(-spawnOffset, spawnOffset), 0f);
-                    spawnPos = WorldBounds.ClampToLand(spawnPos);
-                }
-
-                newAnimal = Instantiate(template.gameObject, spawnPos, Quaternion.identity);
-            }
-            else
-            {
-                // No template animals available - try to use WorldLogic's prefab
-                WorldLogic world = FindAnyObjectByType<WorldLogic>();
-                if (world != null && world.animalPrefab != null)
-                {
-                    Vector3 spawnPos = WorldBounds.IsInitialized ? new Vector3(
+                    // Calculate a random spawn position within the bounds but above the ocean
+                    spawnPos = WorldBounds.ClampToLand(new Vector3(
                         Random.Range(WorldBounds.areaCenter.x - WorldBounds.areaHalfExtents.x, WorldBounds.areaCenter.x + WorldBounds.areaHalfExtents.x),
                         Random.Range(WorldBounds.oceanTopY + 0.2f, WorldBounds.areaCenter.y + WorldBounds.areaHalfExtents.y),
-                        0f) : Vector3.zero;
-
-                    spawnPos = WorldBounds.IsInitialized ? WorldBounds.ClampToLand(spawnPos) : spawnPos;
-                    newAnimal = Instantiate(world.animalPrefab, spawnPos, Quaternion.identity);
+                        0f)
+                    );
                 }
                 else
                 {
-                    Debug.LogWarning("[AnimalRespawn] No animal template or prefab found to spawn immediate animal.");
-                    return;
+                    // Fallback to center if WorldBounds is not initialized
+                    spawnPos = Vector3.zero; 
                 }
+                
+                newAnimal = Instantiate(world.animalPrefab, spawnPos, Quaternion.identity);
             }
-
-            if (newAnimal != null)
+            else
             {
-                AnimalMetabolism am = newAnimal.GetComponent<AnimalMetabolism>();
-                if (am != null)
-                {
-                    am.hunger = am.maxHunger * newbornHungerPercent;
-                    am.biomass = am.maxBiomass * newbornBiomassPercent;
-                    am.isAlive = true;
-                }
-
-                if (EventNotificationUI.Instance != null)
-                {
-                    EventNotificationUI.Instance.NotifyAnimalBirth(newAnimal.name, "(manual)", "(manual)");
-                }
-
-                Debug.Log($"[AnimalRespawn] Immediate spawn: {newAnimal.name}");
+                Debug.LogWarning("[AnimalRespawn] No animal template or prefab found to spawn immediate animal.");
+                return;
             }
         }
+
+        if (newAnimal != null)
+        {
+            AnimalMetabolism am = newAnimal.GetComponent<AnimalMetabolism>();
+            if (am != null)
+            {
+                am.hunger = am.maxHunger * newbornHungerPercent;
+                am.biomass = am.maxBiomass * newbornBiomassPercent;
+                am.isAlive = true;
+            }
+
+            if (EventNotificationUI.Instance != null)
+            {
+                EventNotificationUI.Instance.NotifyAnimalBirth(newAnimal.name, "(manual)", "(manual)");
+            }
+
+            Debug.Log($"[AnimalRespawn] Immediate spawn: {newAnimal.name}");
+        }
+    }
 }

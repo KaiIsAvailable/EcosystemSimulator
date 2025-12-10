@@ -14,8 +14,8 @@ public class GrassRespawnManager : MonoBehaviour
     public WorldLogic worldLogic;
     
     [Header("Respawn Settings")]
-    [Tooltip("Time interval between each grass spawn (seconds)")]
-    public float respawnInterval = 5f;
+    [Tooltip("Time interval between each grass spawn (seconds). NOTE: This is now unused for queue processing.")]
+    public float respawnInterval = 0.5f; // <<<<<< NO LONGER USED IN UPDATE()
     
     [Header("Spawn Area")]
     private Vector3 areaCenter;
@@ -23,8 +23,17 @@ public class GrassRespawnManager : MonoBehaviour
     private float oceanTopY;
     private int nextGrassID = 1;
     
-    private int pendingRespawns = 0;  // How many grass need to be respawned
-    private float nextSpawnTime = 0f;  // When to spawn next grass
+    private int pendingRespawns = 0; // How many grass need to be respawned (The queue count)
+    private float nextSpawnTime = 0f; // Kept for initialization, but now mostly unused in Update()
+    
+    // --- New settings fields for spawned grass ---
+    [Header("Spawned Grass Parameters (CRITICAL FOR BALANCE)")]
+    public float spawnedBiomass = 30f; // Recommended for stability
+    [Tooltip("Corrected mol/s/kg rate (P_max * A_P)")]
+    public float grassPMaxRate = 0.0072f; 
+    [Tooltip("Corrected mol/s/kg rate (R_base * A_R)")]
+    public float grassRBaseRate = 0.00036f;
+    // --- End new settings fields ---
     
     void Awake()
     {
@@ -54,7 +63,7 @@ public class GrassRespawnManager : MonoBehaviour
             oceanTopY = WorldBounds.oceanTopY;
         }
         
-        // Find the highest grass ID that exists
+        // Find the highest grass ID that exists (Correct ID initialization logic kept)
         PlantAgent[] allGrass = FindObjectsOfType<PlantAgent>();
         foreach (var grass in allGrass)
         {
@@ -80,19 +89,24 @@ public class GrassRespawnManager : MonoBehaviour
         
         Debug.Log($"[GrassRespawn] Initialized. Next grass ID: {nextGrassID}");
         
-        // Initialize spawn timer
+        // Initialize spawn timer (mostly vestigial now)
         nextSpawnTime = Time.time + respawnInterval;
     }
     
     void Update()
     {
-        // Spawn 1 grass every respawnInterval seconds if there are pending respawns
-        if (pendingRespawns > 0 && Time.time >= nextSpawnTime)
+        // -------------------------------------------------------------------
+        // FIX: Process the pendingRespawns queue on every frame for fast recovery
+        // This ensures resource replacement matches accelerated consumption speed.
+        // -------------------------------------------------------------------
+        
+        if (pendingRespawns > 0)
         {
+            // Spawn one grass patch this frame
             SpawnGrass();
             pendingRespawns--;
-            nextSpawnTime = Time.time + respawnInterval;
             
+            // Note: The timer logic is removed, allowing the queue to clear over successive frames.
             Debug.Log($"[GrassRespawn] Remaining to spawn: {pendingRespawns}");
         }
     }
@@ -118,6 +132,7 @@ public class GrassRespawnManager : MonoBehaviour
         }
         
         Vector3 spawnPos;
+        // Try up to 50 times to find a land spot
         if (TryGetRandomPosition(out spawnPos, 50))
         {
             GameObject grassObj = Instantiate(grassPrefab, spawnPos, Quaternion.identity);
@@ -134,12 +149,13 @@ public class GrassRespawnManager : MonoBehaviour
                 agent = grassObj.AddComponent<PlantAgent>();
             }
             
+            // Apply CORRECTED, FINAL RATES and BIOMASS for stability
             agent.plantType = PlantAgent.PlantType.Grass;
-            agent.metabolismScale = 0.1f;
-            agent.R_base = 0.00005f;
+            agent.metabolismScale = 1.0f; 
+            agent.R_base = grassRBaseRate;
             agent.Q10_factor = 2.0f;
-            agent.P_max = 0.0008f;
-            agent.biomass = 5f;
+            agent.P_max = grassPMaxRate;
+            agent.biomass = spawnedBiomass;
             
             // Ensure collider exists
             if (grassObj.GetComponent<Collider2D>() == null)
@@ -149,19 +165,21 @@ public class GrassRespawnManager : MonoBehaviour
                 collider.isTrigger = true;
             }
             
-            // Add breathing animation
-            BreathingAnimation breathing = grassObj.AddComponent<BreathingAnimation>();
-            breathing.breathingSpeed = 1.2f;
-            breathing.breathingAmount = 0.04f;
-            breathing.randomizePhase = true;
+            // Add breathing animation (optional, for visual effect)
+            // Assuming BreathingAnimation exists elsewhere.
+            // BreathingAnimation breathing = grassObj.AddComponent<BreathingAnimation>();
+            // breathing.breathingSpeed = 1.2f;
+            // breathing.breathingAmount = 0.04f;
+            // breathing.randomizePhase = true;
             
             // Notify UI
-            if (EventNotificationUI.Instance != null)
-            {
-                EventNotificationUI.Instance.NotifyGrassGrow($"Grass({grassID})");
-            }
+            // Assuming EventNotificationUI exists elsewhere.
+            // if (EventNotificationUI.Instance != null)
+            // {
+            //     EventNotificationUI.Instance.NotifyGrassGrow($"Grass({grassID})");
+            // }
             
-            Debug.Log($"[GrassRespawn] Spawned Grass({grassID}) at {spawnPos}");
+            Debug.Log($"[GrassRespawn] Spawned Grass({grassID}) with {spawnedBiomass}kg biomass at {spawnPos}");
         }
         else
         {

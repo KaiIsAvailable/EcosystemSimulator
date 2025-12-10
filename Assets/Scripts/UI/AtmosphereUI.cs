@@ -635,6 +635,7 @@ public class AtmosphereUI : MonoBehaviour{
     /// Positive values expand right (decrease right offset).
     /// Negative values expand left (decrease left offset).
     /// Bar starts centered at Left: 92, Right: 92
+    /// Max expansion is 92 pixels (clamps at -92 to 0 for left, 0 to -92 for right)
     /// </summary>
     void UpdateBreakdownBar(Image barImage, float value)
     {
@@ -643,16 +644,19 @@ public class AtmosphereUI : MonoBehaviour{
         RectTransform rt = barImage.rectTransform;
         float scaledValue = Mathf.Abs(value) * barScaleFactor;
         
+        // Clamp scaledValue to max 92 pixels expansion
+        scaledValue = Mathf.Min(scaledValue, 92f);
+        
         if (value > 0)
         {
             // Positive: Expand to the right (decrease right offset)
             rt.offsetMin = new Vector2(92, rt.offsetMin.y);  // Left stays at 92
-            rt.offsetMax = new Vector2(-(92 - scaledValue), rt.offsetMax.y);  // Right decreases
+            rt.offsetMax = new Vector2(-(92 - scaledValue), rt.offsetMax.y);  // Right decreases, clamped at 0
         }
         else if (value < 0)
         {
             // Negative: Expand to the left (decrease left offset)
-            rt.offsetMin = new Vector2(92 - scaledValue, rt.offsetMin.y);  // Left decreases
+            rt.offsetMin = new Vector2(92 - scaledValue, rt.offsetMin.y);  // Left decreases, clamped at 0
             rt.offsetMax = new Vector2(-92, rt.offsetMax.y);  // Right stays at 92
         }
         else

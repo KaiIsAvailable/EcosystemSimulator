@@ -14,9 +14,8 @@ GameObject:
   - component: {fileID: 4177502772750787592}
   - component: {fileID: 8101103242380977014}
   - component: {fileID: 9097965277547660108}
-  - component: {fileID: -1163324528198765165}
   - component: {fileID: -3446604018463691863}
-  - component: {fileID: 8443344062141226469}
+  - component: {fileID: 5903970845122389310}
   m_Layer: 0
   m_Name: HumanMan
   m_TagString: Untagged
@@ -115,6 +114,11 @@ MonoBehaviour:
   showBreathing: 1
   breathingSpeed: 1.2
   breathingAmount: 0.06
+  seekMateForBreeding: 1
+  mateSeekDistance: 8
+  huntingSearchRadius: 5
+  eatingRange: 0.6
+  trophicEfficiency: 0.15
 --- !u!50 &4177502772750787592
 Rigidbody2D:
   serializedVersion: 5
@@ -224,30 +228,6 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
   m_Radius: 0.4
---- !u!114 &-1163324528198765165
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5353350407577176133}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b9cf4afdf039ce647b1882550125e805, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  entityType: 2
-  currentEnergy: 70
-  maxEnergy: 100
-  respirationLossRate: 0.3
-  photosynthesisGainRate: 0.5
-  eatingAmount: 10
-  searchRadius: 6
-  searchInterval: 3
-  trophicEfficiency: 0.12
-  isAlive: 1
-  isHungry: 0
-  hungerThreshold: 60
 --- !u!114 &-3446604018463691863
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -301,7 +281,7 @@ MonoBehaviour:
     - rid: 2340870476025036869
       type: {class: ShadowShape2DProvider_SpriteRenderer, ns: UnityEngine.Rendering.Universal, asm: Unity.RenderPipelines.Universal.2D.Runtime}
       data: 
---- !u!114 &8443344062141226469
+--- !u!114 &5903970845122389310
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -315,14 +295,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   biomass: 70
   maxBiomass: 100
-  basalMetabolicRate: 0.000025
+  hunger: 50
+  maxHunger: 100
+  hungerDepletionRate: 8.31
+  hungerSearchThreshold: 40
+  hungerGainPerAnimal: 90
+  basalMetabolicRate: 0.018
   Q10_factor: 1.5
   comfortTemperature: 24
   currentActivity: 0
-  metabolismScale: 0.1
+  metabolismScale: 1
   searchRadius: 5
   searchInterval: 5
   trophicEfficiency: 0.15
   isAlive: 1
-  hungerThreshold: 40
+  useOwnMovement: 0
+  moveSpeed: 1.5
+  wanderRadius: 3
+  eatingRange: 0.6
+  wanderInterval: 3
   totalRespiration: 0

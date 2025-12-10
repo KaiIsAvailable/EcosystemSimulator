@@ -14,9 +14,8 @@ GameObject:
   - component: {fileID: 21471420305310142}
   - component: {fileID: 1919407203810624072}
   - component: {fileID: 1322076820243676467}
-  - component: {fileID: -8689249140359428571}
   - component: {fileID: -8871967679949524613}
-  - component: {fileID: 3580869197733667111}
+  - component: {fileID: 2696433487459342603}
   m_Layer: 3
   m_Name: Animal
   m_TagString: Untagged
@@ -222,30 +221,6 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
   m_Radius: 0.3
---- !u!114 &-8689249140359428571
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6713439815758559079}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b9cf4afdf039ce647b1882550125e805, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  entityType: 1
-  currentEnergy: 80
-  maxEnergy: 100
-  respirationLossRate: 0.2
-  photosynthesisGainRate: 0.5
-  eatingAmount: 10
-  searchRadius: 4
-  searchInterval: 2
-  trophicEfficiency: 0.18
-  isAlive: 1
-  isHungry: 0
-  hungerThreshold: 50
 --- !u!114 &-8871967679949524613
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -299,7 +274,7 @@ MonoBehaviour:
     - rid: 2340870476025036867
       type: {class: ShadowShape2DProvider_SpriteRenderer, ns: UnityEngine.Rendering.Universal, asm: Unity.RenderPipelines.Universal.2D.Runtime}
       data: 
---- !u!114 &3580869197733667111
+--- !u!114 &2696433487459342603
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -315,15 +290,15 @@ MonoBehaviour:
   maxBiomass: 60
   hunger: 50
   maxHunger: 100
-  hungerDepletionRate: 0.2
-  basalMetabolicRate: 0.00002
+  hungerDepletionRate: 8
+  basalMetabolicRate: 0.0144
   Q10_factor: 2
   comfortTemperature: 22
   currentActivity: 0
-  metabolismScale: 0.1
-  eatingAmount: 5
+  metabolismScale: 1
+  eatingAmount: 10
   searchInterval: 3
-  trophicEfficiency: 0.1
+  trophicEfficiency: 1
   moveSpeed: 1.5
   eatingRange: 0.3
   visionRadius: 10

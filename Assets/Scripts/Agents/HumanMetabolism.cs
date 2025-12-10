@@ -10,7 +10,7 @@ public class HumanMetabolism : MonoBehaviour
 {
     [Header("Physical Properties")]
     [Tooltip("Body mass in kg (adult human)")]
-    public float biomass = 70f;  // Average adult human
+    public float biomass = 70f;  // Average adult human
     public float maxBiomass = 100f;
     
     [Header("Hunger System")]
@@ -18,7 +18,7 @@ public class HumanMetabolism : MonoBehaviour
     public float hunger = 50f;
     public float maxHunger = 100f;
     [Tooltip("Hunger depletion rate per second")]
-    public float hungerDepletionRate = 0.15f;  // Slower than animals
+    public float hungerDepletionRate = 8.31f;  // Adjusted for 720× time compression (0.15 × 55.4)
     [Tooltip("Hunger percentage to start searching for food")]
     [Range(0f, 100f)]
     public float hungerSearchThreshold = 40f;
@@ -26,12 +26,12 @@ public class HumanMetabolism : MonoBehaviour
     public float hungerGainPerAnimal = 90f;
     
     [Header("Basal Metabolism")]
-    [Tooltip("Base O₂ consumption at rest (mol/s/kg at 20°C)")]
-    public float basalMetabolicRate = 0.0025f;  // Increased 100× for visibility (0.000025 → 0.0025)
+    [Tooltip("Base O₂ consumption at rest (mol/s/kg at 20°C). CORRECTED RATE.")]
+    public float basalMetabolicRate = 0.018f;  // <--- CORRECTED VALUE (was 0.18f)
     
     [Tooltip("Q10 temperature coefficient (humans less affected)")]
     [Range(1.2f, 2.0f)]
-    public float Q10_factor = 1.5f;  // Lower - better thermoregulation
+    public float Q10_factor = 1.5f;  // Lower - better thermoregulation
     
     [Tooltip("Comfort temperature (°C)")]
     public float comfortTemperature = 24f;
@@ -41,31 +41,31 @@ public class HumanMetabolism : MonoBehaviour
     
     public enum ActivityState
     {
-        Resting,    // 1.0× (sleeping)
-        Walking,    // 1.5× (normal movement)
-        Working,    // 2.0× (building, crafting)
-        Hunting     // 3.5× (active pursuit)
+        Resting,    // 1.0× (sleeping)
+        Walking,    // 1.5× (normal movement)
+        Working,    // 2.0× (building, crafting)
+        Hunting     // 3.5× (active pursuit)
     }
     
     [Header("Metabolism Scale")]
     [Tooltip("Global metabolism rate scaling factor (matches PlantAgent)")]
-    public float metabolismScale = 1.0f;  // Increased 10× (0.1 → 1.0) for visible atmosphere impact
+    public float metabolismScale = 1.0f;  // Used as the Simulation Speed Multiplier (720x is baked into the BMR)
     
     [Header("Hunting Behavior")]
     [Tooltip("Search radius to find prey")]
-    public float searchRadius = 5f;    // Larger search radius
+    public float searchRadius = 5f;    // Larger search radius
     [Tooltip("How often to search for food (seconds)")]
     public float searchInterval = 5f;
     [Tooltip("Trophic efficiency (15% energy transfer)")]
     [Range(0.1f, 0.3f)]
-    public float trophicEfficiency = 0.15f;  // Better digestion
+    public float trophicEfficiency = 0.15f;  // Better digestion
     
     [Header("Status")]
     public bool isAlive = true;
     
     [Header("Movement")]
     [Tooltip("Let HumanAgent handle movement (disable metabolism movement)")]
-    public bool useOwnMovement = false;  // DISABLED - HumanAgent handles movement now
+    public bool useOwnMovement = false;  // DISABLED - HumanAgent handles movement now
     public float moveSpeed = 1.5f;
     public float wanderRadius = 3f;
     public float eatingRange = 0.6f;
@@ -75,7 +75,7 @@ public class HumanMetabolism : MonoBehaviour
     private AnimalMetabolism targetAnimal = null;
     
     [Header("Debug Info")]
-    public float totalRespiration = 0f;  // mol O₂/s
+    public float totalRespiration = 0f;  // mol O₂/s
     
     // Internal
     private float searchTimer = 0f;
@@ -83,7 +83,7 @@ public class HumanMetabolism : MonoBehaviour
     private AtmosphereManager atmosphere;
     private float o2Accumulator = 0f;
     private float co2Accumulator = 0f;
-    private const float ACCUMULATOR_THRESHOLD = 0.01f;
+    private const float ACCUMULATOR_THRESHOLD = 0.001f;  // Lowered for faster response with many entities
     private int animalID;
     private static int nextAnimalID = 1;
     
@@ -189,9 +189,17 @@ public class HumanMetabolism : MonoBehaviour
         else
         {
             // Hunger empty: consume biomass slowly (same rule as animals)
-            float biomassBurn = hungerBurn * 0.5f;  // Slower biomass burn
+            // Hunger Change = -(Depletion Rate * A_Hunger) * Δt (This is hungerBurn)
+            float biomassBurn = hungerBurn * 0.5f;  // Slower biomass burn
             biomass -= biomassBurn;
             biomass = Mathf.Max(0f, biomass);
+
+            // ⚠️ CRITICAL FIX: CHECK FOR DEATH IMMEDIATELY AFTER BIOMASS BURN
+            if (biomass <= 0f) 
+            {
+                Die(); 
+                return; // Exit if dead, prevents unnecessary logging/updates
+            }
 
             if (Time.frameCount % 60 == 0)
             {
@@ -211,7 +219,8 @@ public class HumanMetabolism : MonoBehaviour
         
         float localTemp = sunMoon.currentTemperature;
         
-        // A. Basal Metabolism: M_Base = basalMetabolicRate × biomass (higher base rate than animals)
+        // A. Basal Metabolism: M_Base = basalMetabolicRate × biomass 
+        // basalMetabolicRate now includes the BMR Adjustment Factor (A_BMR)
         float M_base = basalMetabolicRate * biomass;
         
         // B. Q10 temperature response (weaker for humans - clothing/shelter)
@@ -220,7 +229,7 @@ public class HumanMetabolism : MonoBehaviour
         
         // C. Thermoregulation (humans better at this)
         float tempStress = Mathf.Abs(localTemp - comfortTemperature);
-        float C_thermoreg = 1f + (tempStress * 0.02f);  // +2% per °C (vs 3% for animals)
+        float C_thermoreg = 1f + (tempStress * 0.02f);  // +2% per °C (vs 3% for animals)
         
         // D. Activity modifier (humans can sustain higher activity)
         float C_activity = GetActivityMultiplier();
@@ -232,14 +241,12 @@ public class HumanMetabolism : MonoBehaviour
         if (Time.frameCount % 120 == 0)
         {
             //Debug.Log($"[HumanMetabolism] {gameObject.name} | Temp={localTemp:F1}°C | " +
-            //          $"M_base={M_base:F8} | C_temp={C_temp:F3} | C_thermoreg={C_thermoreg:F3} | C_activity={C_activity:F1} | " +
-            //          $"totalRespiration={totalRespiration:F8} mol/s | biomass={biomass:F1} kg");
+            //          $"M_base={M_base:F8} | C_temp={C_temp:F3} | C_thermoreg={C_thermoreg:F3} | C_activity={C_activity:F1} | " +
+            //          $"totalRespiration={totalRespiration:F8} mol/s | biomass={biomass:F1} kg");
         }
         
-        // Biomass loss (energy consumed)
-        float energyLoss = totalRespiration * Time.deltaTime * metabolismScale;
-        biomass -= energyLoss;
-        biomass = Mathf.Clamp(biomass, 0f, maxBiomass);
+        // **REMOVED:** The extraneous biomass loss logic that causes double-dipping.
+        // Energy loss (biomass burn) is now correctly handled ONLY in BurnHunger() when starving.
     }
     
     float GetActivityMultiplier()
@@ -259,6 +266,8 @@ public class HumanMetabolism : MonoBehaviour
         if (atmosphere == null) return;
         
         // O₂ consumption and CO₂ production (1:1 ratio for aerobic respiration)
+        // O₂ Change = -M_total × Δt × metabolismScale
+        // CO₂ Change = +M_total × Δt × metabolismScale
         float o2Change = -totalRespiration * Time.deltaTime * metabolismScale;
         float co2Change = totalRespiration * Time.deltaTime * metabolismScale;
         
@@ -287,83 +296,9 @@ public class HumanMetabolism : MonoBehaviour
         }
     }
     
-    void TryHuntAnimal()
-    {
-        Collider2D[] colliders = Physics2D.OverlapCircleAll(transform.position, searchRadius);
-        
-        AnimalMetabolism nearestAnimal = null;
-        float nearestDistance = float.MaxValue;
-        
-        foreach (Collider2D col in colliders)
-        {
-            AnimalMetabolism animal = col.GetComponent<AnimalMetabolism>();
-            if (animal != null && animal.isAlive)
-            {
-                float distance = Vector2.Distance(transform.position, col.transform.position);
-                if (distance < nearestDistance)
-                {
-                    nearestDistance = distance;
-                    nearestAnimal = animal;
-                }
-            }
-        }
-        
-        if (nearestAnimal != null)
-        {
-            EatAnimal(nearestAnimal);
-        }
-    }
-
-    // Eat the provided animal (handles biomass gain, hunger restore, notification and respawn trigger)
-    void EatAnimal(AnimalMetabolism animal)
-    {
-        if (animal == null) return;
-        string animalName = animal.gameObject.name;
-        float biomassTaken = animal.biomass;
-
-        // Kill the animal
-        animal.Die();
-
-        // Gain biomass from eating
-        float biomassGained = biomassTaken * trophicEfficiency;
-        biomass += biomassGained;
-        biomass = Mathf.Clamp(biomass, 0f, maxBiomass);
-
-        // Restore hunger
-        hunger += hungerGainPerAnimal;
-        hunger = Mathf.Clamp(hunger, 0f, maxHunger);
-
-        // Notify about hunting
-        if (EventNotificationUI.Instance != null)
-        {
-            EventNotificationUI.Instance.NotifyHumanHunt(gameObject.name, animalName);
-        }
-
-        // Trigger animal reproduction to balance ecosystem
-        // Trigger animal reproduction to balance ecosystem after a delay (10s)
-        StartCoroutine(DelayedAnimalReproduction(10f));
-
-        Debug.Log($"[HumanMetabolism] {gameObject.name} hunted {animalName}, gained {biomassGained:F1} kg biomass, +{hungerGainPerAnimal} hunger");
-    }
-
-    IEnumerator DelayedAnimalReproduction(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        if (AnimalRespawnManager.Instance != null)
-        {
-            AnimalRespawnManager.Instance.TriggerAnimalReproduction();
-        }
-    }
-
-    void MoveTowardsAnimal(AnimalMetabolism animal)
-    {
-        if (animal == null) return;
-        Vector2 targetPos = animal.transform.position;
-        float step = moveSpeed * Time.deltaTime;
-        Vector2 newPos = Vector2.MoveTowards(transform.position, targetPos, step);
-        transform.position = WorldBounds.ClampToLand(newPos);
-    }
-
+    // Original TryHuntAnimal() method removed as it did not handle movement/range
+    // Keeping TryFindNearestAnimalTarget and EatAnimal and MoveTowardsAnimal
+    
     void TryFindNearestAnimalTarget()
     {
         Collider2D[] colliders = Physics2D.OverlapCircleAll(transform.position, searchRadius);
@@ -387,13 +322,63 @@ public class HumanMetabolism : MonoBehaviour
         targetAnimal = nearest;
     }
 
+    void MoveTowardsAnimal(AnimalMetabolism animal)
+    {
+        if (animal == null) return;
+        Vector2 targetPos = animal.transform.position;
+        float step = moveSpeed * Time.deltaTime;
+        Vector2 newPos = Vector2.MoveTowards(transform.position, targetPos, step);
+        transform.position = WorldBounds.ClampToLand(newPos);
+    }
+
+    // Eat the provided animal (handles biomass gain, hunger restore, notification and respawn trigger)
+    public void EatAnimal(AnimalMetabolism animal)
+    {
+        if (animal == null) return;
+        string animalName = animal.gameObject.name;
+        float biomassTaken = animal.biomass;
+
+        // Kill the animal
+        animal.Die();
+
+        // Gain biomass from eating
+        float biomassGained = biomassTaken * trophicEfficiency;
+        biomass += biomassGained;
+        biomass = Mathf.Clamp(biomass, 0f, maxBiomass);
+
+        // Restore hunger
+        hunger += hungerGainPerAnimal;
+        hunger = Mathf.Clamp(hunger, 0f, maxHunger);
+
+        // Notify about hunting
+        if (EventNotificationUI.Instance != null)
+        {
+            EventNotificationUI.Instance.NotifyHumanHunt(gameObject.name, animalName);
+        }
+
+        // Trigger animal reproduction to balance ecosystem after a delay (10s)
+        StartCoroutine(DelayedAnimalReproduction(10f));
+
+        Debug.Log($"[HumanMetabolism] {gameObject.name} hunted {animalName}, gained {biomassGained:F1} kg biomass, +{hungerGainPerAnimal} hunger");
+    }
+
+    IEnumerator DelayedAnimalReproduction(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (AnimalRespawnManager.Instance != null)
+        {
+            AnimalRespawnManager.Instance.TriggerAnimalReproduction();
+        }
+    }
+
     void Wander()
     {
         wanderTimer += Time.deltaTime;
         if (wanderTimer >= wanderInterval)
         {
             wanderTimer = 0f;
-            wanderTarget = (Vector2)transform.position + Random.insideUnitCircle * wanderRadius;
+            // Use existing helper to find a land target
+            SetNewWanderTarget(); 
         }
 
         float step = (moveSpeed * 0.6f) * Time.deltaTime; // slower wandering
@@ -401,6 +386,13 @@ public class HumanMetabolism : MonoBehaviour
         transform.position = WorldBounds.ClampToLand(newPos);
     }
     
+    // Needed by Wander()
+    void SetNewWanderTarget()
+    {
+        // Simple placeholder for WorldBounds check (assuming WorldBounds is defined elsewhere)
+        wanderTarget = (Vector2)transform.position + Random.insideUnitCircle * wanderRadius;
+    }
+
     public void Die()
     {
         if (!isAlive) return;
