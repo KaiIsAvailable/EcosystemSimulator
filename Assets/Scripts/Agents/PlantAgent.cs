@@ -95,11 +95,12 @@ public class PlantAgent : MonoBehaviour
         if (plantType == PlantType.Tree)
         {
             verticalLayerH = 0.5f;
-            maxBiomass = 500f; 
+            maxBiomass = 100f; 
         }
         else // Grass
         {
             verticalLayerH = 0.0f;
+            biomass = 30f;  // Set grass to fixed 30kg biomass
             maxBiomass = 30f;
         }
     }

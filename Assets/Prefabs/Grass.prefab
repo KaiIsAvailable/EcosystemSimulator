@@ -191,7 +191,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 34e11c55877b89447b830623c9cd102c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  plantType: 0
+  plantType: 1
   R_base: 0.00072
   Q10_factor: 2.5
   L_comp_ratio: 0.1

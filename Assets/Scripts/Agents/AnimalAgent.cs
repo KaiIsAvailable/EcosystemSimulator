@@ -36,6 +36,8 @@ public class AnimalWander : MonoBehaviour
     private SpriteRenderer sr; // optional if you want FlipX
     private Vector3 originalScale;
     private float breathingTimer = 0f;
+    private SunMoonController sunMoon;
+    private AnimalMetabolism metabolism;
 
     public enum FacingMode { Rotate, FlipX }
 
@@ -43,6 +45,8 @@ public class AnimalWander : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         sr = GetComponent<SpriteRenderer>(); // ok if null when Rotate mode
+        sunMoon = FindAnyObjectByType<SunMoonController>();
+        metabolism = GetComponent<AnimalMetabolism>();
         originalScale = transform.localScale;
         
         // Disable gravity for top-down view
@@ -67,7 +71,31 @@ public class AnimalWander : MonoBehaviour
 
     void FixedUpdate()
     {
-        // Breathing animation (always active)
+        // Check if it's nighttime - sleep system
+        bool isSleeping = (sunMoon != null && sunMoon.currentTimeOfDay == SunMoonController.TimeOfDay.Night);
+        
+        if (isSleeping)
+        {
+            // Stop all movement during night
+            rb.linearVelocity = Vector2.zero;
+            
+            // Set metabolism to resting state
+            if (metabolism != null)
+            {
+                metabolism.currentActivity = AnimalMetabolism.ActivityState.Resting;
+            }
+            
+            // Breathing animation (slower during sleep)
+            if (showBreathing)
+            {
+                breathingTimer += Time.fixedDeltaTime * breathingSpeed * 0.5f; // Half speed breathing
+                float breathScale = 1f + Mathf.Sin(breathingTimer) * breathingAmount * 0.5f; // Less movement
+                transform.localScale = originalScale * breathScale;
+            }
+            return; // Skip all movement logic
+        }
+        
+        // Breathing animation (normal during day)
         if (showBreathing)
         {
             breathingTimer += Time.fixedDeltaTime * breathingSpeed;
@@ -75,7 +103,7 @@ public class AnimalWander : MonoBehaviour
             transform.localScale = originalScale * breathScale;
         }
         
-        // Movement (only if enabled)
+        // Movement (only if enabled and awake)
         if (!canMove) return;
         
         // If near target, pick a new one

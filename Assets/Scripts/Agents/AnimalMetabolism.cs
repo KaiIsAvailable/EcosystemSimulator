@@ -40,7 +40,8 @@ public class AnimalMetabolism : MonoBehaviour
     
     public enum ActivityState
     {
-        Resting,   // 1.0× (sleeping, standing)
+        Sleeping,  // 0.75× (nighttime sleep - reduced metabolism)
+        Resting,   // 1.0× (awake but not moving)
         Grazing,   // 1.2× (eating plants)
         Walking,   // 1.5× (normal movement)
         Fleeing    // 3.0× (running from predators)
@@ -116,14 +117,33 @@ public class AnimalMetabolism : MonoBehaviour
     {
         if (!isAlive) return;
         
+        // Check if it's nighttime
+        bool isNightTime = (sunMoon != null && sunMoon.currentTimeOfDay == SunMoonController.TimeOfDay.Night);
+        
         // Always burn hunger first (engine always runs)
         BurnHunger();
         
         CalculateMetabolism();
         ProcessGasExchange();
         
-        // If hunger is low, search for food
-        if (hunger < maxHunger * 0.5f)  // Start looking when below 50% (hunger 40-50 triggers search)
+        // Wake up mechanic: If hungry at night (hunger < 30%), wake up to find food
+        bool shouldWakeUpForFood = isNightTime && hunger < maxHunger * 0.3f;
+        
+        // Sleep logic: Only sleep if it's night AND not too hungry
+        if (isNightTime && !shouldWakeUpForFood)
+        {
+            currentActivity = ActivityState.Sleeping;
+            return; // Skip food searching and movement
+        }
+        
+        // If we woke up at night due to hunger, trigger faster reproduction (balance mechanism)
+        if (shouldWakeUpForFood && Time.frameCount % 600 == 0)
+        {
+            TriggerNighttimeReproduction();
+        }
+        
+        // If hunger is low, search for food (works both day and night now)
+        if (hunger < maxHunger * 0.5f)  // Start looking when below 50%
         {
             // Search for new target if we don't have one
             if (targetPlant == null || targetPlant.biomass < 5f)
@@ -162,7 +182,14 @@ public class AnimalMetabolism : MonoBehaviour
     
     void BurnHunger()
     {
-        float hungerBurn = hungerDepletionRate * Time.deltaTime;
+        // Apply hunger reduction based on activity state
+        float hungerMultiplier = 1.0f;
+        if (currentActivity == ActivityState.Sleeping)
+            hungerMultiplier = 0.1f;  // 90% reduction during sleep (sleeping slows hunger)
+        else if (currentActivity == ActivityState.Resting)
+            hungerMultiplier = 0.5f;  // 50% reduction when awake but still
+        
+        float hungerBurn = hungerDepletionRate * hungerMultiplier * Time.deltaTime;
 
         if (hunger > 0f)
         {
@@ -175,13 +202,20 @@ public class AnimalMetabolism : MonoBehaviour
         }
         else
         {
-            // Hunger is zero. Start grace period.
+            // Hunger is zero - burn biomass to survive
+            
+            // If sleeping, burn biomass much slower (0.1× rate)
+            float starvationMultiplier = 1.0f;
+            if (currentActivity == ActivityState.Sleeping)
+                starvationMultiplier = 0.1f;  // 90% slower biomass burn during sleep
+            
+            // Advance starvation timer
             starvationTimer += Time.deltaTime;
 
             if (starvationTimer >= starvationGracePeriod)
             {
                 // Grace period over: consume biomass
-                float biomassBurn = hungerBurn * 0.5f;
+                float biomassBurn = hungerBurn * 0.5f * starvationMultiplier;
                 biomass -= biomassBurn;
                 biomass = Mathf.Max(0f, biomass);
 
@@ -241,6 +275,7 @@ public class AnimalMetabolism : MonoBehaviour
     {
         switch (currentActivity)
         {
+            case ActivityState.Sleeping: return 0.75f;  // 25% metabolic reduction during sleep
             case ActivityState.Resting: return 1.0f;
             case ActivityState.Grazing: return 1.2f;
             case ActivityState.Walking: return 1.5f;
@@ -477,6 +512,23 @@ public class AnimalMetabolism : MonoBehaviour
         
         // Fallback: stay near current position if all attempts failed
         wanderTarget = (Vector2)transform.position + Random.insideUnitCircle * 0.5f;
+    }
+    
+    /// <summary>
+    /// Trigger faster reproduction when animals wake up at night to find food.
+    /// This balances the ecosystem by compensating for nighttime activity stress.
+    /// </summary>
+    void TriggerNighttimeReproduction()
+    {
+        if (AnimalRespawnManager.Instance != null)
+        {
+            // 50% chance to trigger reproduction when waking up hungry at night
+            if (Random.value > 0.5f)
+            {
+                AnimalRespawnManager.Instance.TriggerAnimalReproduction();
+                Debug.Log($"[Animal] {gameObject.name} triggered nighttime reproduction (hunger={hunger:F1})");
+            }
+        }
     }
     
     public void Die()

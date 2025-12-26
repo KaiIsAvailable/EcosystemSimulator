@@ -41,7 +41,8 @@ public class HumanMetabolism : MonoBehaviour
     
     public enum ActivityState
     {
-        Resting,    // 1.0× (sleeping)
+        Sleeping,   // 0.75× (nighttime sleep - reduced metabolism)
+        Resting,    // 1.0× (awake but not moving)
         Walking,    // 1.5× (normal movement)
         Working,    // 2.0× (building, crafting)
         Hunting     // 3.5× (active pursuit)
@@ -111,15 +112,34 @@ public class HumanMetabolism : MonoBehaviour
     {
         if (!isAlive) return;
         
+        // Check if it's nighttime
+        bool isNightTime = (sunMoon != null && sunMoon.currentTimeOfDay == SunMoonController.TimeOfDay.Night);
+        
         BurnHunger();
         CalculateMetabolism();
         ProcessGasExchange();
         
-        // MOVEMENT DISABLED - Let HumanAgent handle all movement for breeding
-        if (!useOwnMovement) return;
+        // Wake up mechanic: If hungry at night (hunger < 30%), wake up to find food
+        bool shouldWakeUpForFood = isNightTime && hunger < maxHunger * 0.3f;
         
-        // Movement & behavior (ONLY if useOwnMovement is enabled)
+        // Sleep logic: Only sleep if it's night AND not too hungry
+        if (isNightTime && !shouldWakeUpForFood)
+        {
+            currentActivity = ActivityState.Sleeping;
+            return; // Skip hunting and movement
+        }
+        
+        // Calculate hunger for emergency hunting check
         float hungerPercent = (hunger / maxHunger) * 100f;
+        bool isEmergencyHunger = hungerPercent < hungerSearchThreshold;
+        
+        // Allow emergency hunting even if useOwnMovement is disabled (survival priority)
+        // Or if useOwnMovement is enabled (normal behavior)
+        bool allowHunting = isEmergencyHunger || useOwnMovement;
+        
+        // MOVEMENT DISABLED - Let HumanAgent handle all movement for breeding
+        // EXCEPT when emergency hunger (need to hunt to survive)
+        if (!allowHunting) return;
 
         if (hungerPercent < hungerSearchThreshold)
         {
@@ -168,8 +188,14 @@ public class HumanMetabolism : MonoBehaviour
     
     void BurnHunger()
     {
-        // Gradually deplete hunger over time
-        float hungerBurn = hungerDepletionRate * Time.deltaTime;
+        // Apply hunger reduction based on activity state
+        float hungerMultiplier = 1.0f;
+        if (currentActivity == ActivityState.Sleeping)
+            hungerMultiplier = 0.1f;  // 90% reduction during sleep (sleeping slows hunger)
+        else if (currentActivity == ActivityState.Resting)
+            hungerMultiplier = 0.5f;  // 50% reduction when awake but still
+        
+        float hungerBurn = hungerDepletionRate * hungerMultiplier * Time.deltaTime;
 
         if (hunger > 0f)
         {
@@ -188,9 +214,16 @@ public class HumanMetabolism : MonoBehaviour
         }
         else
         {
-            // Hunger empty: consume biomass slowly (same rule as animals)
+            // Hunger is zero - burn biomass to survive
+            
+            // If sleeping, burn biomass much slower (0.1× rate)
+            float starvationMultiplier = 1.0f;
+            if (currentActivity == ActivityState.Sleeping)
+                starvationMultiplier = 0.1f;  // 90% slower biomass burn during sleep
+            
+            // Hunger empty and awake: consume biomass slowly
             // Hunger Change = -(Depletion Rate * A_Hunger) * Δt (This is hungerBurn)
-            float biomassBurn = hungerBurn * 0.5f;  // Slower biomass burn
+            float biomassBurn = hungerBurn * 0.5f * starvationMultiplier;
             biomass -= biomassBurn;
             biomass = Mathf.Max(0f, biomass);
 
@@ -253,6 +286,7 @@ public class HumanMetabolism : MonoBehaviour
     {
         switch (currentActivity)
         {
+            case ActivityState.Sleeping: return 0.75f;  // 25% metabolic reduction during sleep
             case ActivityState.Resting: return 1.0f;
             case ActivityState.Walking: return 1.5f;
             case ActivityState.Working: return 2.0f;

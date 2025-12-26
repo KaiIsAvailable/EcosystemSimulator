@@ -5,8 +5,9 @@ using UnityEngine.EventSystems;
 /// <summary>
 /// Controls panel visibility based on button hover and click interactions.
 /// Hover shows panel temporarily, click locks it visible.
+/// Help panel is draggable.
 /// </summary>
-public class PanelToggleController : MonoBehaviour
+public class PanelToggleController : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
     [Header("Atmosphere Button & Panel")]
     public Button atmosphereBtn;
@@ -28,6 +29,10 @@ public class PanelToggleController : MonoBehaviour
     public Button logBtn;
     public GameObject notificationPanel;
     
+    [Header("Help Button & Draggable Panel")]
+    public Button helpBtn;
+    public GameObject helpPanel;
+    
     [Header("Breakdown Panel (shows on GasFlow hover)")]
     public GameObject breakdownPanel;
     
@@ -36,11 +41,17 @@ public class PanelToggleController : MonoBehaviour
     private bool populationLocked = false;
     private bool gasflowLocked = false;
     private bool controlLocked = false;
+    private bool helpLocked = false;
     
     // Track notification panel position state
     private bool notificationPanelExtended = false;
     private float normalPanelTop = 0f;
     private bool normalTopSaved = false;
+    
+    // Help panel dragging
+    private RectTransform helpPanelRect;
+    private Vector2 dragOffset;
+    private bool isDraggingHelp = false;
     
     void Start()
     {
@@ -77,6 +88,19 @@ public class PanelToggleController : MonoBehaviour
             breakdownPanel.SetActive(false);
         }
         
+        if (helpPanel != null)
+        {
+            Debug.Log("[PanelToggleController] Hiding: " + helpPanel.name);
+            helpPanel.SetActive(false);
+            
+            // Get RectTransform for dragging
+            helpPanelRect = helpPanel.GetComponent<RectTransform>();
+            if (helpPanelRect == null)
+            {
+                Debug.LogError("[PanelToggleController] Help panel must have a RectTransform!");
+            }
+        }
+        
         // Setup atmosphere button
         SetupButton(atmosphereBtn, atmospherePanel, 
                     () => atmosphereLocked, 
@@ -97,10 +121,22 @@ public class PanelToggleController : MonoBehaviour
                     () => controlLocked, 
                     (locked) => controlLocked = locked);
         
-        // Setup log button (notification panel)
+        // Setup help button (draggable panel)
+        SetupButton(helpBtn, helpPanel, 
+                    () => helpLocked, 
+                    (locked) => helpLocked = locked);
+        
+        // Setup log button (notification panel) with hover effect
         if (logBtn != null && notificationPanel != null)
         {
             logBtn.onClick.AddListener(ToggleNotificationPanel);
+            SetupButtonHoverEffect(logBtn);
+        }
+        
+        // Setup help button hover effect (already has SetupButton, just add hover)
+        if (helpBtn != null)
+        {
+            SetupButtonHoverEffect(helpBtn);
         }
         
         Debug.Log("[PanelToggleController] Setup complete!");
@@ -207,6 +243,37 @@ public class PanelToggleController : MonoBehaviour
     }
     
     /// <summary>
+    /// Adds hover effect to buttons that don't have panel toggle behavior
+    /// </summary>
+    void SetupButtonHoverEffect(Button btn)
+    {
+        if (btn == null) return;
+        
+        // Add EventTrigger component if not present
+        EventTrigger trigger = btn.gameObject.GetComponent<EventTrigger>();
+        if (trigger == null)
+        {
+            trigger = btn.gameObject.AddComponent<EventTrigger>();
+        }
+        
+        // Hover Enter - Set alpha to 1
+        EventTrigger.Entry pointerEnter = new EventTrigger.Entry();
+        pointerEnter.eventID = EventTriggerType.PointerEnter;
+        pointerEnter.callback.AddListener((data) => { 
+            SetButtonAlpha(btn, 1f);
+        });
+        trigger.triggers.Add(pointerEnter);
+        
+        // Hover Exit - Reset alpha to 0.5
+        EventTrigger.Entry pointerExit = new EventTrigger.Entry();
+        pointerExit.eventID = EventTriggerType.PointerExit;
+        pointerExit.callback.AddListener((data) => { 
+            SetButtonAlpha(btn, 0.5f);
+        });
+        trigger.triggers.Add(pointerExit);
+    }
+    
+    /// <summary>
     /// Toggles notification panel between normal position and top=500
     /// </summary>
     void ToggleNotificationPanel()
@@ -254,5 +321,48 @@ public class PanelToggleController : MonoBehaviour
             // Hide breakdown panel if gasflow panel is not active
             breakdownPanel.SetActive(false);
         }
+    }
+    
+    // Drag handlers for help panel
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        if (helpPanel == null || !helpPanel.activeSelf || helpPanelRect == null) return;
+        
+        // Check if drag started on help panel
+        if (RectTransformUtility.RectangleContainsScreenPoint(helpPanelRect, eventData.position, eventData.pressEventCamera))
+        {
+            isDraggingHelp = true;
+            
+            // Calculate offset between mouse and panel position
+            Vector2 localPointerPosition;
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                helpPanelRect.parent as RectTransform,
+                eventData.position,
+                eventData.pressEventCamera,
+                out localPointerPosition))
+            {
+                dragOffset = helpPanelRect.anchoredPosition - localPointerPosition;
+            }
+        }
+    }
+    
+    public void OnDrag(PointerEventData eventData)
+    {
+        if (!isDraggingHelp || helpPanelRect == null) return;
+        
+        Vector2 localPointerPosition;
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            helpPanelRect.parent as RectTransform,
+            eventData.position,
+            eventData.pressEventCamera,
+            out localPointerPosition))
+        {
+            helpPanelRect.anchoredPosition = localPointerPosition + dragOffset;
+        }
+    }
+    
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        isDraggingHelp = false;
     }
 }

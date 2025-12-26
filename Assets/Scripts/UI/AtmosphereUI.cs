@@ -31,10 +31,10 @@ public class AtmosphereUI : MonoBehaviour{
     [Header("Gas Flow & Temperature Displays")]
     public Text o2FlowText;
     public Text co2FlowText;
-    public Image o2PositiveImage;
-    public Image o2NegativeImage;
-    public Image co2PositiveImage;
-    public Image co2NegativeImage;
+    [Tooltip("O2 flow bar (grows up when positive, down when negative)")]
+    public Image o2FlowBar;
+    [Tooltip("CO2 flow bar (grows up when positive, down when negative)")]
+    public Image co2FlowBar;
     public Text temperatureText;
     public Image hotTempImage;
     public Image coldTempImage;
@@ -68,8 +68,8 @@ public class AtmosphereUI : MonoBehaviour{
     public Text oceanCO2Text;
     
     [Header("Bar Scaling")]
-    [Tooltip("Scale factor for breakdown bars (higher = more sensitive)")]
-    public float barScaleFactor = 10f;
+    [Tooltip("Scale factor for breakdown bars: 1 mol/day = 0.01 pixels")]
+    public float barScaleFactor = 0.01f;
     
     [Header("Environmental Status UI (Optional)")]
     public Text environmentalStatusText;
@@ -321,27 +321,18 @@ public class AtmosphereUI : MonoBehaviour{
                 co2FlowText.text = $"{totalCO2_molPerDay:+0.00;-0.00} mol/day {co2Arrow}";
             }
             
-            // Update O2 Flow Images (show positive or negative based on O2 flow)
-            if (o2PositiveImage != null)
+            // Debug: Check if bars are assigned
+            if (Time.frameCount % 120 == 0)
             {
-                o2PositiveImage.gameObject.SetActive(totalO2_molPerDay > 0);
+                Debug.Log($"[AtmosphereUI] Bar Assignment Check: o2FlowBar={(o2FlowBar != null ? "ASSIGNED" : "NULL")}, co2FlowBar={(co2FlowBar != null ? "ASSIGNED" : "NULL")}");
+                Debug.Log($"[AtmosphereUI] Flow Values: O2={totalO2_molPerDay:F2} mol/day, CO2={totalCO2_molPerDay:F2} mol/day");
             }
             
-            if (o2NegativeImage != null)
-            {
-                o2NegativeImage.gameObject.SetActive(totalO2_molPerDay < 0);
-            }
+            // Update O2 Flow Bar (grows up when positive, down when negative)
+            UpdateFlowBar(o2FlowBar, totalO2_molPerDay);
             
-            // Update CO2 Flow Images (show positive or negative based on CO2 flow)
-            if (co2PositiveImage != null)
-            {
-                co2PositiveImage.gameObject.SetActive(totalCO2_molPerDay > 0);
-            }
-            
-            if (co2NegativeImage != null)
-            {
-                co2NegativeImage.gameObject.SetActive(totalCO2_molPerDay < 0);
-            }
+            // Update CO2 Flow Bar (grows up when positive, down when negative)
+            UpdateFlowBar(co2FlowBar, totalCO2_molPerDay);
         }
         
         // Update Temperature Display
@@ -485,9 +476,16 @@ public class AtmosphereUI : MonoBehaviour{
         }
 
         string oceanSection = "";
-        if (atmosphere.oceanAbsorptionRate > 0)
+        if (atmosphere.baseOceanAbsorption > 0)
         {
-            oceanSection = $"Ocean CO₂ Sink: {atmosphere.oceanAbsorptionRate:F2} mol/day\n";
+            // Calculate dynamic ocean rate based on current temperature
+            SunMoonController sunMoon = FindAnyObjectByType<SunMoonController>();
+            float currentTemp = sunMoon != null ? sunMoon.currentTemperature : atmosphere.referenceTemperature;
+            float tempDifference = atmosphere.referenceTemperature - currentTemp;
+            float modifier = 1.0f + (tempDifference * atmosphere.henryFactor);
+            float dynamicRate = atmosphere.baseOceanAbsorption * modifier;
+            
+            oceanSection = $"Ocean CO₂ Sink: {dynamicRate:F2} mol/day (Temp: {currentTemp:F1}°C)\n";
         }
 
         titleText.text = "Atmosphere Composition (Rain Forest)";
@@ -644,20 +642,41 @@ public class AtmosphereUI : MonoBehaviour{
         RectTransform rt = barImage.rectTransform;
         float scaledValue = Mathf.Abs(value) * barScaleFactor;
         
+        // Debug logging every 2 seconds
+        if (Time.frameCount % 120 == 0 && barImage == photoO2Bar)
+        {
+            Debug.Log($"[UpdateBreakdownBar] photoO2Bar: value={value:F2}, scaledValue BEFORE clamp={scaledValue:F2}, barScaleFactor={barScaleFactor}");
+        }
+        
         // Clamp scaledValue to max 92 pixels expansion
         scaledValue = Mathf.Min(scaledValue, 92f);
+        
+        if (Time.frameCount % 120 == 0 && barImage == photoO2Bar)
+        {
+            Debug.Log($"[UpdateBreakdownBar] photoO2Bar: scaledValue AFTER clamp={scaledValue:F2}");
+        }
         
         if (value > 0)
         {
             // Positive: Expand to the right (decrease right offset)
             rt.offsetMin = new Vector2(92, rt.offsetMin.y);  // Left stays at 92
             rt.offsetMax = new Vector2(-(92 - scaledValue), rt.offsetMax.y);  // Right decreases, clamped at 0
+            
+            if (Time.frameCount % 120 == 0 && barImage == photoO2Bar)
+            {
+                Debug.Log($"[UpdateBreakdownBar] POSITIVE: offsetMin.x=92, offsetMax.x={-(92 - scaledValue):F2} (RIGHT edge, should be negative)");
+            }
         }
         else if (value < 0)
         {
             // Negative: Expand to the left (decrease left offset)
             rt.offsetMin = new Vector2(92 - scaledValue, rt.offsetMin.y);  // Left decreases, clamped at 0
             rt.offsetMax = new Vector2(-92, rt.offsetMax.y);  // Right stays at 92
+            
+            if (Time.frameCount % 120 == 0 && barImage == photoO2Bar)
+            {
+                Debug.Log($"[UpdateBreakdownBar] NEGATIVE: offsetMin.x={92 - scaledValue:F2} (LEFT edge), offsetMax.x=-92");
+            }
         }
         else
         {
@@ -684,6 +703,93 @@ public class AtmosphereUI : MonoBehaviour{
         {
             // Show with sign: +3.5 or -0.6
             textElement.text = $"{value:+0.0;-0.0}";
+        }
+    }
+    
+    /// <summary>
+    /// Updates a flow bar to grow upward (positive) or downward (negative).
+    /// Container has 250px total height, with text at bottom 50px, leaving 200px for bars (50-250 range).
+    /// Uses stretch-stretch anchoring:
+    /// - Positive: Bottom FIXED at 50, Top changes 200→0 (value 100 → top=100, value 50 → top=150)
+    /// - Negative: Top FIXED at 0, Bottom changes 250→50 (value -100 → bottom=150, value -50 → bottom=200)
+    /// </summary>
+    void UpdateFlowBar(Image barImage, float value)
+    {
+        if (barImage == null)
+        {
+            if (Time.frameCount % 120 == 0)
+            {
+                Debug.LogWarning("[UpdateFlowBar] barImage is NULL!");
+            }
+            return;
+        }
+        
+        // Make sure the bar GameObject is active
+        if (!barImage.gameObject.activeSelf)
+        {
+            barImage.gameObject.SetActive(true);
+            Debug.Log($"[UpdateFlowBar] Activated {barImage.name}");
+        }
+        
+        RectTransform rt = barImage.rectTransform;
+        
+        // Scale: 1 mol/day = 0.02 pixels, so 5000 mol/day = 100px (half bar), 10000 mol/day = 200px (full bar)
+        float scaledValue = value * 0.02f;
+        float clampedValue = Mathf.Clamp(scaledValue, -200f, 200f);
+        
+        // Debug logging (every 60 frames for O2, every 61 frames for CO2)
+        bool isO2 = barImage == o2FlowBar;
+        bool isCO2 = barImage == co2FlowBar;
+        bool shouldLog = (isO2 && Time.frameCount % 60 == 0) || (isCO2 && Time.frameCount % 61 == 0);
+        
+        if (shouldLog)
+        {
+            string barName = isO2 ? "O2" : "CO2";
+            Debug.Log($"[UpdateFlowBar {barName}] value={value:F2}, clampedValue={clampedValue:F2}");
+            Debug.Log($"  Before: offsetMin={rt.offsetMin}, offsetMax={rt.offsetMax}");
+        }
+        
+        if (clampedValue > 0.01f)
+        {
+            // Positive (increase): Bar grows UPWARD
+            // Bottom FIXED at 50, Top = 200 - value (so value increases → top decreases toward 0)
+            // Examples: value=100 → top=100, value=50 → top=150, value=200 → top=0
+            float topPos = 200f - clampedValue;
+            rt.offsetMin = new Vector2(rt.offsetMin.x, 50);  // Bottom FIXED at 50
+            rt.offsetMax = new Vector2(rt.offsetMax.x, -topPos);  // Top position directly from value
+            
+            if (shouldLog)
+            {
+                Debug.Log($"  → POSITIVE: topPos={topPos:F1}, offsetMin.y=50 (FIXED), offsetMax.y={-topPos:F1}");
+                Debug.Log($"  After: offsetMin={rt.offsetMin}, offsetMax={rt.offsetMax}");
+            }
+        }
+        else if (clampedValue < -0.01f)
+        {
+            // Negative (decrease): Bar grows DOWNWARD
+            // Top FIXED at 0, Bottom = 250 + value (value is negative, so this decreases toward 50)
+            // Examples: value=-100 → bottom=150, value=-50 → bottom=200, value=-200 → bottom=50
+            float bottomPos = 250f + clampedValue; // value is negative, so this subtracts
+            rt.offsetMin = new Vector2(rt.offsetMin.x, bottomPos);  // Bottom position directly from value
+            rt.offsetMax = new Vector2(rt.offsetMax.x, 0);  // Top FIXED at 0
+            
+            if (shouldLog)
+            {
+                Debug.Log($"  → NEGATIVE: bottomPos={bottomPos:F1}, offsetMin.y={bottomPos:F1}, offsetMax.y=0 (FIXED)");
+                Debug.Log($"  After: offsetMin={rt.offsetMin}, offsetMax={rt.offsetMax}");
+            }
+        }
+        else
+        {
+            // Zero: Minimal bar at boundary (1px visible)
+            rt.offsetMin = new Vector2(rt.offsetMin.x, 50);  // Bottom at 50
+            rt.offsetMax = new Vector2(rt.offsetMax.x, -200);  // Top at 200 (hidden)
+            
+            if (shouldLog)
+            {
+                Debug.Log($"  → ZERO: offsetMin.y=50, offsetMax.y=-200 (hidden)");
+                Debug.Log($"  After: offsetMin={rt.offsetMin}, offsetMax={rt.offsetMax}");
+            }
         }
     }
 }

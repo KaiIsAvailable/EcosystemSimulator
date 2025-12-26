@@ -18,9 +18,9 @@ public class WorldLogic : MonoBehaviour
 
     [Header("Counts")]
     // Recommended balanced starting numbers:
-    public int treeCount = 400; // INCREASED: Required for atmospheric balance
+    public int treeCount = 400; // INCREASED: Required for atmospheric balance (based on 100kg/tree)
     public int grassCount = 55;      
-    public int animalCount = 15; // Increased animal count to match your previous test data
+    public int animalCount = 15; // Increased animal count for test stability
     public int manCount = 1;
     public int womanCount = 1;
     public int sunCount = 1;
@@ -59,11 +59,17 @@ public class WorldLogic : MonoBehaviour
             Mathf.Max(0f, size.x / 2f - padding.x),
             Mathf.Max(0f, size.y / 2f - padding.y)
         );
+        
+        // Initialize WorldBounds early so other scripts can use it
+        // Note: oceanTopY will be set in Start() after SpawnOcean(), so we initialize with 0 for now
+        WorldBounds.Initialize(areaCenter, halfExtents, 0f);
     }
 
     void Start()
     {
         SpawnOcean();
+        
+        // Update WorldBounds with correct oceanTopY after ocean is spawned
         WorldBounds.Initialize(areaCenter, halfExtents, oceanTopY);
         
         SpawnTrees();
@@ -165,24 +171,27 @@ public class WorldLogic : MonoBehaviour
         }
         
         agent.plantType = type;
-        agent.metabolismScale = 1.0f; // Ensure scale is 1.0f for accuracy (0.1f was for visual)
+        agent.metabolismScale = 1.0f; 
         
         if (type == PlantAgent.PlantType.Tree)
         {
             agent.R_base = 0.00072f;
             agent.Q10_factor = 2.5f;
-            // CRITICAL FIX: Restore P_max to scientifically derived, high growth rate
             agent.P_max = 0.0108f; 
-            agent.biomass = 10f;
-            agent.maxBiomass = 500f; // Apply max biomass cap
+            
+            // ⭐ FINAL FIX: Set Tree biomass to 100 kg starting mass for balance
+            agent.biomass = 100f; 
+            agent.maxBiomass = 500f; 
         }
         else // Grass
         {
             agent.R_base = 0.00036f;
             agent.Q10_factor = 2.0f;
             agent.P_max = 0.0072f;
+            
+            // Grass energy mass remains smaller
             agent.biomass = 5f;
-            agent.maxBiomass = 30f; // Apply max biomass cap
+            agent.maxBiomass = 30f; 
         }
         
         var biomassEnergy = plant.GetComponent<BiomassEnergy>();
@@ -229,10 +238,6 @@ public class WorldLogic : MonoBehaviour
             {
                 var go = Instantiate(animalPrefab, pos, Quaternion.identity);
                 occupied.Add(pos);
-
-                // IMPORTANT: The AnimalMetabolism script must be on the prefab or added here 
-                // to use the scientific metabolism system, but the old GasExchanger is used below.
-                // We assume the AnimalMetabolism script is now handling the gas exchange logic internally.
                 
                 AddGasExchanger(go, GasExchanger.EntityType.Animal);
                 AddBreathingAnimation(go, 1.5f, 0.05f);

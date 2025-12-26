@@ -295,6 +295,7 @@ MonoBehaviour:
   Q10_factor: 2
   comfortTemperature: 22
   currentActivity: 0
+  starvationGracePeriod: 1
   metabolismScale: 1
   eatingAmount: 10
   searchInterval: 3

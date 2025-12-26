@@ -38,11 +38,13 @@ public class HumanAgent : MonoBehaviour
     private HumanMetabolism myMetabolism;
     private bool isSeekingMate = false;
     private HumanAgent assignedMate = null;
+    private SunMoonController sunMoon;
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         myMetabolism = GetComponent<HumanMetabolism>();
+        sunMoon = FindAnyObjectByType<SunMoonController>();
         originalScale = transform.localScale;
         
         rb.gravityScale = 0f;
@@ -57,7 +59,31 @@ public class HumanAgent : MonoBehaviour
 
     void FixedUpdate()
     {
-        // Breathing animation
+        // Check if it's nighttime - sleep system
+        bool isSleeping = (sunMoon != null && sunMoon.currentTimeOfDay == SunMoonController.TimeOfDay.Night);
+        
+        if (isSleeping)
+        {
+            // Stop all movement during night
+            rb.linearVelocity = Vector2.zero;
+            
+            // Set metabolism to resting state
+            if (myMetabolism != null)
+            {
+                myMetabolism.currentActivity = HumanMetabolism.ActivityState.Resting;
+            }
+            
+            // Breathing animation (slower during sleep)
+            if (showBreathing)
+            {
+                breathingTimer += Time.fixedDeltaTime * breathingSpeed * 0.5f; // Half speed breathing
+                float breathScale = 1f + Mathf.Sin(breathingTimer) * breathingAmount * 0.5f; // Less movement
+                transform.localScale = originalScale * breathScale;
+            }
+            return; // Skip all movement logic
+        }
+        
+        // Breathing animation (normal during day)
         if (showBreathing)
         {
             breathingTimer += Time.fixedDeltaTime * breathingSpeed;
@@ -65,7 +91,7 @@ public class HumanAgent : MonoBehaviour
             transform.localScale = originalScale * breathScale;
         }
         
-        // Movement (only if enabled)
+        // Movement (only if enabled and awake)
         if (!canMove || myMetabolism == null || !myMetabolism.isAlive) return;
         
         // PRIORITY 1: Hunt if hungry
@@ -184,6 +210,13 @@ public class HumanAgent : MonoBehaviour
     // Simplified target picking using WorldBounds initialized area
     void PickNewTarget()
     {
+        // Safety check: If WorldBounds not initialized yet, use current position
+        if (!WorldBounds.IsInitialized)
+        {
+            target = transform.position;
+            return;
+        }
+        
         target = WorldBounds.GetRandomLandPosition();
     }
     

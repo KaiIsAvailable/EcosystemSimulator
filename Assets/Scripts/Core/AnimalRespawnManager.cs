@@ -15,8 +15,8 @@ public class AnimalRespawnManager : MonoBehaviour
     [Tooltip("Number of parent animals required for reproduction")]
     public int parentsRequired = 2;
     
-    [Tooltip("Maximum number of animals allowed in the world. Reproduction will be skipped when this limit is reached.")]
-    public int maxAnimals = 30;
+    [Tooltip("Maximum number of animals allowed for AUTOMATIC reproduction (system-triggered). User interactions have no limit.")]
+    public int maxAnimalsAutomatic = 10;
     
     [Tooltip("Starting hunger percentage for newborns (0-1)")]
     [Range(0f, 1f)]
@@ -42,19 +42,20 @@ public class AnimalRespawnManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Trigger reproduction when an animal dies.
+    /// Trigger reproduction when an animal dies or nighttime hunger triggers.
     /// Finds 2 random alive animals and spawns 1 new offspring.
     /// </summary>
-    public void TriggerAnimalReproduction()
+    /// <param name="isAutomatic">True if triggered by system (death/hunger), False if triggered by user interaction</param>
+    public void TriggerAnimalReproduction(bool isAutomatic = true)
     {
         // Find all alive animals
         AnimalMetabolism[] allAnimals = FindObjectsOfType<AnimalMetabolism>();
         AnimalMetabolism[] aliveAnimals = System.Array.FindAll(allAnimals, a => a.isAlive);
 
-        // Enforce maximum animal population
-        if (aliveAnimals.Length >= maxAnimals)
+        // Only enforce limit for automatic reproduction (user interactions have no limit)
+        if (isAutomatic && aliveAnimals.Length >= maxAnimalsAutomatic)
         {
-            Debug.Log($"[AnimalRespawn] Population at or above max ({aliveAnimals.Length}/{maxAnimals}), skipping reproduction.");
+            Debug.Log($"[AnimalRespawn] Population at or above automatic max ({aliveAnimals.Length}/{maxAnimalsAutomatic}), skipping auto-reproduction.");
             return;
         }
 

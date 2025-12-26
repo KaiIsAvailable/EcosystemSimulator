@@ -109,6 +109,7 @@ MonoBehaviour:
   speed: 2
   retargetInterval: 3
   arriveDistance: 0.2
+  isMale: 1
   areaCenter: {x: 0, y: 0, z: 0}
   areaHalfExtents: {x: 0, y: 0}
   showBreathing: 1
@@ -116,9 +117,6 @@ MonoBehaviour:
   breathingAmount: 0.06
   seekMateForBreeding: 1
   mateSeekDistance: 8
-  huntingSearchRadius: 5
-  eatingRange: 0.6
-  trophicEfficiency: 0.15
 --- !u!50 &4177502772750787592
 Rigidbody2D:
   serializedVersion: 5
